@@ -1,0 +1,55 @@
+{
+  "name": "bykaranteli-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for live crypto derivatives data from bykaranteli.com: funding rates, funding arbitrage, open interest pressure, Fear & Greed, BTC dominance and verified signal performance. Free, no API key.",
+  "type": "module",
+  "bin": {
+    "bykaranteli-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', 0o755)\"",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "crypto",
+    "funding-rate",
+    "open-interest",
+    "liquidation",
+    "fear-and-greed",
+    "btc-dominance",
+    "binance",
+    "derivatives",
+    "trading",
+    "claude"
+  ],
+  "author": "ByKaranteli (https://bykaranteli.com)",
+  "license": "MIT",
+  "homepage": "https://bykaranteli.com/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bykarantelicom/bykaranteli-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bykarantelicom/bykaranteli-mcp/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0"
+  }
+}
