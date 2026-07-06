@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.bykaranteli/mcp",
-  "description": "Live crypto derivatives data: funding rates, cross-exchange funding arbitrage, open interest pressure, Fear & Greed, BTC dominance and a verified signal track record. Free, no API key.",
+  "description": "Live crypto data: funding rates, funding arbitrage, OI pressure, Fear & Greed. Free, no API key.",
   "repository": {
     "url": "https://github.com/bykarantelicom/bykaranteli-mcp",
     "source": "github"
