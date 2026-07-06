@@ -8,17 +8,32 @@
  * generated-at timestamp; quote it when citing values.
  */
 
+import { createRequire } from "node:module";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+// Single source of truth for the version: package.json ships in the tarball
+// and sits one level above both src/ and dist/.
+const { version: VERSION } = createRequire(import.meta.url)("../package.json") as { version: string };
+
 const BASE_URL = (process.env.BYKARANTELI_BASE_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
-const USER_AGENT = "bykaranteli-mcp/0.1.0 (+https://github.com/bykarantelicom/bykaranteli-mcp)";
+const USER_AGENT = `bykaranteli-mcp/${VERSION} (+https://github.com/bykarantelicom/bykaranteli-mcp)`;
 const TIMEOUT_MS = 15_000;
+
+// Read-only GET tools over an open-world public API, all of them.
+const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
+
+/** Invalid tool input (not a network problem): no retry hint in the error. */
+class InputError extends Error {}
 
 async function fetchJson(path: string): Promise<unknown> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(
+    () => controller.abort(new Error(`${path} timed out after ${TIMEOUT_MS / 1000}s`)),
+    TIMEOUT_MS,
+  );
   try {
     const res = await fetch(`${BASE_URL}${path}`, {
       signal: controller.signal,
@@ -44,13 +59,12 @@ function ok(data: unknown): ToolResult {
 
 function fail(err: unknown): ToolResult {
   const message = err instanceof Error ? err.message : String(err);
+  const text =
+    err instanceof InputError
+      ? `Invalid input: ${message}`
+      : `Error fetching data from bykaranteli.com: ${message}. The API is free and unauthenticated; transient errors usually resolve on retry.`;
   return {
-    content: [
-      {
-        type: "text",
-        text: `Error fetching data from bykaranteli.com: ${message}. The API is free and unauthenticated; transient errors usually resolve on retry.`,
-      },
-    ],
+    content: [{ type: "text", text }],
     isError: true,
   };
 }
@@ -58,18 +72,19 @@ function fail(err: unknown): ToolResult {
 const SYMBOL_RE = /^[A-Z0-9]{5,20}$/;
 
 function normalizeSymbol(raw: string): string {
-  const s = raw.trim().toUpperCase();
-  // Accept bare coin names ("BTC", "sol") and expand to the USDT perp.
+  // Accept the spellings models actually produce: "BTC/USDT", "btc-usdt",
+  // "BTC USDT", bare "BTC". Strip separators, then expand to the USDT perp.
+  const s = raw.trim().toUpperCase().replace(/[\s/_-]+/g, "");
   const expanded = s.endsWith("USDT") ? s : `${s}USDT`;
   if (!SYMBOL_RE.test(expanded)) {
-    throw new Error(`"${raw}" is not a valid symbol. Use a Binance USDT-M perp symbol like BTCUSDT or a coin name like BTC.`);
+    throw new InputError(`"${raw}" is not a valid symbol. Use a Binance USDT-M perp symbol like BTCUSDT or a coin name like BTC.`);
   }
   return expanded;
 }
 
 const server = new McpServer({
   name: "bykaranteli",
-  version: "0.1.0",
+  version: VERSION,
 });
 
 server.registerTool(
@@ -79,6 +94,7 @@ server.registerTool(
     description:
       "Call this when the user asks about overall crypto market sentiment or macro state: the Fear & Greed index (today and yesterday), Bitcoin dominance percentage, total market cap, or the Retail Euphoria composite. Live values refreshed about every 30 minutes.",
     inputSchema: {},
+    annotations: READ_ONLY,
   },
   async () => {
     try {
@@ -111,13 +127,14 @@ server.registerTool(
   {
     title: "Funding rates across top-30 Binance perps",
     description:
-      "Call this when the user asks about current crypto funding rates in general, which coins have extreme funding, or funding for one specific coin. Returns per-symbol funding rate (per settlement interval), 24h open interest change and 24h price change for the top-30 Binance USDT-M perpetuals. Positive funding means longs pay shorts.",
+      "Call this when the user asks for the full current funding table across the top-30 Binance perp universe, or the funding rate of one specific coin. For a pre-ranked top-10 of the most extreme funding rates, use get_top_movers instead. Returns per-symbol funding rate (per settlement interval), 24h open interest change and 24h price change for the top-30 Binance USDT-M perpetuals. Positive funding means longs pay shorts.",
     inputSchema: {
       symbol: z
         .string()
         .optional()
         .describe("Optional. Filter to one symbol, e.g. BTCUSDT or just BTC. Omit to get all 30 rows."),
     },
+    annotations: READ_ONLY,
   },
   async ({ symbol }) => {
     try {
@@ -150,6 +167,7 @@ server.registerTool(
     description:
       "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across Binance, OKX, Bybit, Gate, HTX and BingX for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost).",
     inputSchema: {},
+    annotations: READ_ONLY,
   },
   async () => {
     try {
@@ -166,13 +184,13 @@ server.registerTool(
   {
     title: "Derivatives pressure scores (funding + OI + basis composite)",
     description:
-      "Call this when the user asks which coins are crowded, over-leveraged, or under derivatives stress, or asks about the pressure score of a specific coin. Each symbol gets a 0-100 composite score built from funding rate, 1h/4h/24h open interest deltas and basis, with a LONG/SHORT/NEUTRAL direction and a plain-language regime label.",
+      "Call this when the user asks which coins are crowded or over-leveraged, or asks for the pressure/derivatives-stress score of specific coins. For a quick top-10 ranking of the highest-stress coins right now, use get_top_movers instead. Each symbol gets a 0-100 composite score built from funding rate, 1h/4h/24h open interest deltas and basis, with a LONG/SHORT/NEUTRAL direction and a plain-language regime label.",
     inputSchema: {
       symbol: z
         .string()
         .optional()
         .describe("Optional. Return only this symbol, e.g. BTCUSDT or BTC."),
-      limit: z
+      limit: z.coerce
         .number()
         .int()
         .min(1)
@@ -180,6 +198,7 @@ server.registerTool(
         .optional()
         .describe("Optional. Max rows to return when no symbol filter is set (default 20, sorted by score)."),
     },
+    annotations: READ_ONLY,
   },
   async ({ symbol, limit }) => {
     try {
@@ -225,6 +244,7 @@ server.registerTool(
     description:
       "Call this when the user asks what is moving in crypto derivatives right now, which coins have the biggest open interest changes, the most extreme funding, the widest basis, or the highest derivatives stress. Returns four top-10 lists in one call.",
     inputSchema: {},
+    annotations: READ_ONLY,
   },
   async () => {
     try {
@@ -243,6 +263,7 @@ server.registerTool(
     description:
       "Call this when the user asks how the ByKaranteli signal engine is doing today, or wants recent closed LONG/SHORT signals with real outcomes (TP1, SL or TIMEOUT) and net basis-point results. Includes a 24h summary (wins, losses, net bps). Every signal is published with a SHA-256 receipt and results are net of fees, slippage and funding; live signals only, never backtests.",
     inputSchema: {},
+    annotations: READ_ONLY,
   },
   async () => {
     try {
@@ -263,10 +284,14 @@ server.registerTool(
     inputSchema: {
       symbol: z.string().describe("The symbol, e.g. BTCUSDT, or a coin name like BTC."),
       window_days: z
-        .union([z.literal(30), z.literal(90), z.literal(180)])
+        .preprocess(
+          (v) => (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : v),
+          z.union([z.literal(30), z.literal(90), z.literal(180)]),
+        )
         .optional()
         .describe("Optional lookback window in days (30, 90 or 180). Default 90."),
     },
+    annotations: READ_ONLY,
   },
   async ({ symbol, window_days }) => {
     try {
@@ -307,6 +332,7 @@ server.registerTool(
     description:
       "Call this when the user asks which trading strategies are performing best, or wants win rate, profit factor, drawdown and Sharpe per strategy. Rankings are computed from live closed signals only (no backtests), net of fees.",
     inputSchema: {},
+    annotations: READ_ONLY,
   },
   async () => {
     try {
@@ -319,6 +345,15 @@ server.registerTool(
 );
 
 async function main() {
+  // If the host dies while a response is in flight, exit quietly instead of
+  // crashing with an unhandled EPIPE from the stdout pipe. Non-EPIPE stream
+  // errors would be swallowed once a listener exists, so log and exit nonzero.
+  process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EPIPE") process.exit(0);
+    console.error("bykaranteli-mcp stdout error:", err);
+    process.exit(1);
+  });
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stdout is the JSON-RPC channel; log to stderr only.
