@@ -45,6 +45,8 @@ Requires Node.js 18 or newer.
 | `get_recent_signals` | "How did the signals do in the last 24h?" |
 | `get_symbol_performance` | "Win rate on ETHUSDT over 90 days?" |
 | `get_strategy_leaderboard` | "Which strategies are performing best?" |
+| `get_liquidations` | "How much was liquidated today?", "Did longs or shorts get flushed this week?" |
+| `get_etf_flows` | "Did the Bitcoin ETFs buy or sell yesterday?", "Cumulative ETH ETF inflow?" |
 
 All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL to the human-readable page. Symbols accept both `BTCUSDT` and bare `BTC`.
 

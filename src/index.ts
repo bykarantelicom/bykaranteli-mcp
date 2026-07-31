@@ -123,6 +123,77 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_liquidations",
+  {
+    title: "Crypto liquidations: daily long/short totals per symbol and exchange",
+    description:
+      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own Binance, Bybit and OKX stream collectors (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
+    inputSchema: {
+      symbol: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z0-9]{2,20}$/)
+        .optional()
+        .describe("Optional symbol filter like BTCUSDT or ETHUSDT. Omit for all symbols."),
+      days: z.number().int().min(1).max(90).optional().describe("How many most recent days to return (default 7)."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol, days }: { symbol?: string; days?: number }) => {
+    try {
+      const d = (await fetchJson("/api/v1/public/datasets/liquidations-daily.json")) as {
+        rows?: Array<Record<string, unknown>>;
+      };
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      const wantDays = days ?? 7;
+      const dates = [...new Set(rows.map((r) => String(r.date)))].sort().reverse().slice(0, wantDays);
+      const dateSet = new Set(dates);
+      const filtered = rows.filter(
+        (r) => dateSet.has(String(r.date)) && (!symbol || String(r.symbol).toUpperCase() === symbol),
+      );
+      return ok({
+        rows: filtered.slice(0, 400),
+        note: "Recorded from public exchange streams; totals are a floor (Binance throttles its stream). Live 24h view: " + BASE_URL + "/liquidations",
+        source: `${BASE_URL}/liquidations`,
+      });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_etf_flows",
+  {
+    title: "US spot Bitcoin and Ethereum ETF daily flows",
+    description:
+      "Call this when the user asks about Bitcoin or Ethereum ETF flows: daily net inflows or outflows, cumulative flow since launch, or total net assets of the US spot ETFs (IBIT, FBTC, ETHA and the rest). Returns one row per finalized US trading day and asset with net inflow, total net assets, cumulative inflow and value traded, all in USD. About 14 months of history.",
+    inputSchema: {
+      asset: z.enum(["BTC", "ETH"]).optional().describe("Filter to one asset. Omit for both."),
+      days: z.number().int().min(1).max(400).optional().describe("How many most recent trading days to return (default 10)."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ asset, days }: { asset?: "BTC" | "ETH"; days?: number }) => {
+    try {
+      const d = (await fetchJson("/api/v1/public/datasets/etf-flows.json")) as {
+        rows?: Array<Record<string, unknown>>;
+      };
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      const filtered = rows.filter((r) => !asset || String(r.asset) === asset);
+      return ok({
+        rows: filtered.slice(0, (days ?? 10) * (asset ? 1 : 2)),
+        note: "Finalized US trading days only; a positive net_inflow_usd means the funds bought more of the asset than they sold that day.",
+        source: `${BASE_URL}/etf`,
+      });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_funding_heatmap",
   {
     title: "Funding rates across top-30 Binance perps",

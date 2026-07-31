@@ -54,7 +54,7 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 8, names.join(","));
+check("tools/list count", names.length === 10, names.join(","));
 check(
   "all tools annotated read-only",
   (list.result?.tools ?? []).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
@@ -72,6 +72,20 @@ check(
   "get_market_indices",
   !indices.isError && indices.text.includes("fearGreed") && indices.text.includes("generatedAt"),
   indices.text.slice(0, 80).replace(/\n/g, " "),
+);
+
+const liq = await call("get_liquidations", { symbol: "BTCUSDT", days: 3 });
+check(
+  "get_liquidations(BTCUSDT)",
+  !liq.isError && liq.text.includes("long_liquidations_usd") && liq.text.includes("BTCUSDT"),
+  liq.text.slice(0, 80).replace(/\n/g, " "),
+);
+
+const etf = await call("get_etf_flows", { asset: "BTC", days: 5 });
+check(
+  "get_etf_flows(BTC)",
+  !etf.isError && etf.text.includes("net_inflow_usd") && etf.text.includes("BTC"),
+  etf.text.slice(0, 80).replace(/\n/g, " "),
 );
 
 const heat = await call("get_funding_heatmap", { symbol: "btc" });
