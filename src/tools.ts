@@ -407,4 +407,58 @@ server.registerTool(
     }
   },
 );
+
+server.registerTool(
+  "get_cot_positioning",
+  {
+    title: "CME futures positioning (weekly COT report, BTC + ETH)",
+    description:
+      "Call this when the user asks how hedge funds or institutions are positioned in Bitcoin or Ethereum, or about the CFTC Commitments of Traders report. Returns net positions in contracts, week-over-week changes, open interest and notable extremes/streaks, from official CFTC data updated every Friday. Note: a large share of hedge fund shorts is the market-neutral basis trade, so the weekly change carries more signal than the level.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/cot"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_options_snapshot",
+  {
+    title: "Options walls, gamma exposure and DVOL (BTC + ETH)",
+    description:
+      "Call this when the user asks where the big options bets sit, about call/put walls, gamma exposure (GEX), the zero-gamma level, implied volatility (DVOL) or the IV term structure for Bitcoin or Ethereum. Daily snapshot of listed crypto options: top strikes by open interest, put/call ratio, dealer hedging map and ATM IV by expiry.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/options"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_coinbase_premium",
+  {
+    title: "Coinbase Premium (US demand gauge) + carry yield",
+    description:
+      "Call this when the user asks whether US investors are buying or selling Bitcoin or Ethereum, about the Coinbase Premium, or what the cash-and-carry basis trade pays. Returns the latest daily premium in percent, 7-day average, same-sign streak, the last 30 days, and annualized quarterly carry yields. History since 2017; positive premium = US buying pressure.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/premium"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
 }
