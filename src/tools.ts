@@ -6,7 +6,7 @@
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 export type RegisterOptions = {
   /** Override the public API origin (hosted endpoint uses the internal one). */
