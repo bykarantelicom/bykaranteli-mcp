@@ -1,0 +1,410 @@
+/**
+ * Tool registrations for the ByKaranteli MCP server, transport-agnostic.
+ * The stdio bin (index.ts) and the hosted Streamable HTTP endpoint on
+ * bykaranteli.com both call registerByKaranteliTools on their own server
+ * instance, so the 10 tools have exactly one definition.
+ */
+
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+
+export type RegisterOptions = {
+  /** Override the public API origin (hosted endpoint uses the internal one). */
+  baseUrl?: string;
+  /** Version string for the outbound user-agent. */
+  version?: string;
+};
+
+export function registerByKaranteliTools(server: McpServer, options?: RegisterOptions): void {
+  const BASE_URL = (options?.baseUrl ?? process.env.BYKARANTELI_BASE_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
+  const USER_AGENT = `bykaranteli-mcp/${options?.version ?? "dev"} (+https://github.com/bykarantelicom/bykaranteli-mcp)`;
+  const TIMEOUT_MS = 15_000;
+
+// Read-only GET tools over an open-world public API, all of them.
+const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
+
+/** Invalid tool input (not a network problem): no retry hint in the error. */
+class InputError extends Error {}
+
+async function fetchJson(path: string): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error(`${path} timed out after ${TIMEOUT_MS / 1000}s`)),
+    TIMEOUT_MS,
+  );
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      signal: controller.signal,
+      headers: { accept: "application/json", "user-agent": USER_AGENT },
+    });
+    if (!res.ok) {
+      throw new Error(`${path} returned HTTP ${res.status}`);
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+type ToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+};
+
+function ok(data: unknown): ToolResult {
+  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+}
+
+function fail(err: unknown): ToolResult {
+  const message = err instanceof Error ? err.message : String(err);
+  const text =
+    err instanceof InputError
+      ? `Invalid input: ${message}`
+      : `Error fetching data from bykaranteli.com: ${message}. The API is free and unauthenticated; transient errors usually resolve on retry.`;
+  return {
+    content: [{ type: "text", text }],
+    isError: true,
+  };
+}
+
+const SYMBOL_RE = /^[A-Z0-9]{5,20}$/;
+
+function normalizeSymbol(raw: string): string {
+  // Accept the spellings models actually produce: "BTC/USDT", "btc-usdt",
+  // "BTC USDT", bare "BTC". Strip separators, then expand to the USDT perp.
+  const s = raw.trim().toUpperCase().replace(/[\s/_-]+/g, "");
+  const expanded = s.endsWith("USDT") ? s : `${s}USDT`;
+  if (!SYMBOL_RE.test(expanded)) {
+    throw new InputError(`"${raw}" is not a valid symbol. Use a Binance USDT-M perp symbol like BTCUSDT or a coin name like BTC.`);
+  }
+  return expanded;
+}
+
+server.registerTool(
+  "get_market_indices",
+  {
+    title: "Crypto market indices (Fear & Greed, BTC dominance, euphoria)",
+    description:
+      "Call this when the user asks about overall crypto market sentiment or macro state: the Fear & Greed index (today and yesterday), Bitcoin dominance percentage, total market cap, or the Retail Euphoria composite. Live values refreshed about every 30 minutes.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      const d = (await fetchJson("/api/public/indices")) as Record<string, unknown>;
+      // Trim heavy internals (weights/contributions) but keep the readable parts.
+      const euphoria = d.euphoria as Record<string, unknown> | undefined;
+      return ok({
+        generatedAt: d.generatedAt,
+        fearGreed: d.fearGreed,
+        global: d.global,
+        stablecoins: d.stablecoins,
+        euphoria: euphoria
+          ? {
+              score: euphoria.score,
+              regime: euphoria.regime,
+              regimeLabel: euphoria.regimeLabel,
+              explainer: euphoria.explainer,
+            }
+          : undefined,
+        source: `${BASE_URL}/indices`,
+      });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_liquidations",
+  {
+    title: "Crypto liquidations: daily long/short totals per symbol and exchange",
+    description:
+      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own Binance, Bybit and OKX stream collectors (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
+    inputSchema: {
+      symbol: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z0-9]{2,20}$/)
+        .optional()
+        .describe("Optional symbol filter like BTCUSDT or ETHUSDT. Omit for all symbols."),
+      days: z.number().int().min(1).max(90).optional().describe("How many most recent days to return (default 7)."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol, days }: { symbol?: string; days?: number }) => {
+    try {
+      const d = (await fetchJson("/api/v1/public/datasets/liquidations-daily.json")) as {
+        rows?: Array<Record<string, unknown>>;
+      };
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      const wantDays = days ?? 7;
+      const dates = [...new Set(rows.map((r) => String(r.date)))].sort().reverse().slice(0, wantDays);
+      const dateSet = new Set(dates);
+      const filtered = rows.filter(
+        (r) => dateSet.has(String(r.date)) && (!symbol || String(r.symbol).toUpperCase() === symbol),
+      );
+      return ok({
+        rows: filtered.slice(0, 400),
+        note: "Recorded from public exchange streams; totals are a floor (Binance throttles its stream). Live 24h view: " + BASE_URL + "/liquidations",
+        source: `${BASE_URL}/liquidations`,
+      });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_etf_flows",
+  {
+    title: "US spot Bitcoin and Ethereum ETF daily flows",
+    description:
+      "Call this when the user asks about Bitcoin or Ethereum ETF flows: daily net inflows or outflows, cumulative flow since launch, or total net assets of the US spot ETFs (IBIT, FBTC, ETHA and the rest). Returns one row per finalized US trading day and asset with net inflow, total net assets, cumulative inflow and value traded, all in USD. About 14 months of history.",
+    inputSchema: {
+      asset: z.enum(["BTC", "ETH"]).optional().describe("Filter to one asset. Omit for both."),
+      days: z.number().int().min(1).max(400).optional().describe("How many most recent trading days to return (default 10)."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ asset, days }: { asset?: "BTC" | "ETH"; days?: number }) => {
+    try {
+      const d = (await fetchJson("/api/v1/public/datasets/etf-flows.json")) as {
+        rows?: Array<Record<string, unknown>>;
+      };
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      const filtered = rows.filter((r) => !asset || String(r.asset) === asset);
+      return ok({
+        rows: filtered.slice(0, (days ?? 10) * (asset ? 1 : 2)),
+        note: "Finalized US trading days only; a positive net_inflow_usd means the funds bought more of the asset than they sold that day.",
+        source: `${BASE_URL}/etf`,
+      });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_funding_heatmap",
+  {
+    title: "Funding rates across top-30 Binance perps",
+    description:
+      "Call this when the user asks for the full current funding table across the top-30 Binance perp universe, or the funding rate of one specific coin. For a pre-ranked top-10 of the most extreme funding rates, use get_top_movers instead. Returns per-symbol funding rate (per settlement interval), 24h open interest change and 24h price change for the top-30 Binance USDT-M perpetuals. Positive funding means longs pay shorts.",
+    inputSchema: {
+      symbol: z
+        .string()
+        .optional()
+        .describe("Optional. Filter to one symbol, e.g. BTCUSDT or just BTC. Omit to get all 30 rows."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol }) => {
+    try {
+      const d = (await fetchJson("/api/public/heatmap")) as {
+        generatedAt: string;
+        rows: Array<{ symbol: string }>;
+      };
+      if (symbol) {
+        const want = normalizeSymbol(symbol);
+        const row = d.rows.find((r) => r.symbol === want);
+        if (!row) {
+          return ok({
+            generatedAt: d.generatedAt,
+            note: `${want} is not in the top-30 heatmap set. Tracked symbols: ${d.rows.map((r) => r.symbol).join(", ")}`,
+          });
+        }
+        return ok({ generatedAt: d.generatedAt, row, source: `${BASE_URL}/heatmap` });
+      }
+      return ok({ ...d, source: `${BASE_URL}/heatmap` });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_funding_arbitrage",
+  {
+    title: "Cross-exchange funding arbitrage opportunities",
+    description:
+      "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across Binance, OKX, Bybit, Gate, HTX and BingX for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost).",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      const d = (await fetchJson("/api/public/funding-arb")) as Record<string, unknown>;
+      return ok({ ...d, source: `${BASE_URL}/funding-arb` });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_pressure_scores",
+  {
+    title: "Derivatives pressure scores (funding + OI + basis composite)",
+    description:
+      "Call this when the user asks which coins are crowded or over-leveraged, or asks for the pressure/derivatives-stress score of specific coins. For a quick top-10 ranking of the highest-stress coins right now, use get_top_movers instead. Each symbol gets a 0-100 composite score built from funding rate, 1h/4h/24h open interest deltas and basis, with a LONG/SHORT/NEUTRAL direction and a plain-language regime label.",
+    inputSchema: {
+      symbol: z
+        .string()
+        .optional()
+        .describe("Optional. Return only this symbol, e.g. BTCUSDT or BTC."),
+      limit: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe("Optional. Max rows to return when no symbol filter is set (default 20, sorted by score)."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol, limit }) => {
+    try {
+      const d = (await fetchJson("/api/public/pressure")) as {
+        generatedAt: string;
+        items: Array<Record<string, unknown> & { symbol: string }>;
+      };
+      const slim = (it: Record<string, unknown>) => ({
+        symbol: it.symbol,
+        score: it.score,
+        direction: it.direction,
+        regimeLabel: it.regimeLabel,
+        components: it.components,
+        explainer: it.explainer,
+      });
+      if (symbol) {
+        const want = normalizeSymbol(symbol);
+        const item = d.items.find((i) => i.symbol === want);
+        if (!item) {
+          return ok({
+            generatedAt: d.generatedAt,
+            note: `${want} is not in the tracked pressure universe right now.`,
+          });
+        }
+        return ok({ generatedAt: d.generatedAt, item: slim(item), source: `${BASE_URL}/pressure` });
+      }
+      return ok({
+        generatedAt: d.generatedAt,
+        items: d.items.slice(0, limit ?? 20).map(slim),
+        totalTracked: d.items.length,
+        source: `${BASE_URL}/pressure`,
+      });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_top_movers",
+  {
+    title: "Top movers: OI spikes, extreme funding, widest basis, highest stress",
+    description:
+      "Call this when the user asks what is moving in crypto derivatives right now, which coins have the biggest open interest changes, the most extreme funding, the widest basis, or the highest derivatives stress. Returns four top-10 lists in one call.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      const d = (await fetchJson("/api/public/top-movers")) as Record<string, unknown>;
+      return ok({ ...d, source: `${BASE_URL}/top-movers` });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_recent_signals",
+  {
+    title: "Recent closed trading signals with verified outcomes",
+    description:
+      "Call this when the user asks how the ByKaranteli signal engine is doing today, or wants recent closed LONG/SHORT signals with real outcomes (TP1, SL or TIMEOUT) and net basis-point results. Includes a 24h summary (wins, losses, net bps). Every signal is published with a SHA-256 receipt and results are net of fees, slippage and funding; live signals only, never backtests.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      const d = (await fetchJson("/api/public/recent")) as Record<string, unknown>;
+      return ok({ ...d, source: `${BASE_URL}/signals` });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_symbol_performance",
+  {
+    title: "Per-symbol signal performance and recent trades",
+    description:
+      "Call this when the user asks how signals performed on a specific coin (win rate, profit factor, net PnL, best/worst trade) or wants that coin's recent closed signals. Data is the live verified track record for one Binance USDT-M perp over a 30, 90 or 180 day window.",
+    inputSchema: {
+      symbol: z.string().describe("The symbol, e.g. BTCUSDT, or a coin name like BTC."),
+      window_days: z
+        .preprocess(
+          (v) => (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : v),
+          z.union([z.literal(30), z.literal(90), z.literal(180)]),
+        )
+        .optional()
+        .describe("Optional lookback window in days (30, 90 or 180). Default 90."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol, window_days }) => {
+    try {
+      const want = normalizeSymbol(symbol);
+      const w = window_days ?? 90;
+      let d: Record<string, unknown>;
+      try {
+        d = (await fetchJson(`/api/v1/public/symbols/${want}?window=${w}`)) as Record<string, unknown>;
+      } catch (err) {
+        // The API 404s when the symbol has no closed signals in the chosen
+        // window (data-dependent, not an invalid request). Say so plainly.
+        if (err instanceof Error && err.message.includes("HTTP 404")) {
+          return ok({
+            symbol: want,
+            window_days: w,
+            note: `No closed signals recorded for ${want} in the last ${w} days (or the symbol is not tracked). Try window_days: 180, or check ${BASE_URL}/symbols/${want}.`,
+          });
+        }
+        throw err;
+      }
+      // daily_points can be long; the stats + recent signals carry the answer.
+      const daily = d.daily_points as unknown[] | undefined;
+      return ok({
+        ...d,
+        daily_points: Array.isArray(daily) ? daily.slice(-30) : daily,
+        source: `${BASE_URL}/symbols/${want}`,
+      });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_strategy_leaderboard",
+  {
+    title: "Strategy leaderboard with verified live results",
+    description:
+      "Call this when the user asks which trading strategies are performing best, or wants win rate, profit factor, drawdown and Sharpe per strategy. Rankings are computed from live closed signals only (no backtests), net of fees.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      const d = (await fetchJson("/api/v1/public/leaderboard")) as Record<string, unknown>;
+      return ok({ ...d, source: `${BASE_URL}/leaderboard` });
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+}

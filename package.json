@@ -1,6 +1,6 @@
 {
   "name": "bykaranteli-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for live crypto derivatives data from bykaranteli.com: funding rates, funding arbitrage, open interest pressure, Fear & Greed, BTC dominance and verified signal performance. Free, no API key.",
   "type": "module",
   "bin": {
@@ -53,5 +53,15 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.5.0"
   },
-  "mcpName": "com.bykaranteli/mcp"
+  "mcpName": "com.bykaranteli/mcp",
+  "exports": {
+    ".": {
+      "types": "./dist/tools.d.ts",
+      "default": "./dist/tools.js"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.ts",
+      "default": "./dist/tools.js"
+    }
+  }
 }
