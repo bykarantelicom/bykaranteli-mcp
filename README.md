@@ -47,6 +47,9 @@ Requires Node.js 18 or newer.
 | `get_strategy_leaderboard` | "Which strategies are performing best?" |
 | `get_liquidations` | "How much was liquidated today?", "Did longs or shorts get flushed this week?" |
 | `get_etf_flows` | "Did the Bitcoin ETFs buy or sell yesterday?", "Cumulative ETH ETF inflow?" |
+| `get_cot_positioning` | "Are hedge funds long or short Bitcoin?", "What did the COT report show?" |
+| `get_options_snapshot` | "Where are the BTC option walls?", "What is DVOL / the zero-gamma level?" |
+| `get_coinbase_premium` | "Are US investors buying Bitcoin?", "What does the basis trade pay?" |
 
 All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL to the human-readable page. Symbols accept both `BTCUSDT` and bare `BTC`.
 
