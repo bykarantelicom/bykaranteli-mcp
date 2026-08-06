@@ -50,6 +50,9 @@ Requires Node.js 18 or newer.
 | `get_cot_positioning` | "Are hedge funds long or short Bitcoin?", "What did the COT report show?" |
 | `get_options_snapshot` | "Where are the BTC option walls?", "What is DVOL / the zero-gamma level?" |
 | `get_coinbase_premium` | "Are US investors buying Bitcoin?", "What does the basis trade pay?" |
+| `get_flow_toxicity` | "Is toxic order flow building?", "What is BTC's VPIN right now?" |
+| `get_options_flow` | "What are the big options players buying?", "Any block trades today?" |
+| `get_slippage` | "How much slippage on a $1M market order?", "Which book is thinnest?" |
 
 All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL to the human-readable page. Symbols accept both `BTCUSDT` and bare `BTC`.
 

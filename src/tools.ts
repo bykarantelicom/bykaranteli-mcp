@@ -461,4 +461,58 @@ server.registerTool(
     }
   },
 );
+
+server.registerTool(
+  "get_flow_toxicity",
+  {
+    title: "Order-flow toxicity (VPIN) for BTC, ETH, SOL perps",
+    description:
+      "Call this when the user asks whether informed or toxic order flow is building, about VPIN, or whether market makers are under pressure in Bitcoin, Ethereum or Solana. Returns the current VPIN (0 = balanced, 1 = fully one-sided), its 90-day percentile, the danger threshold and the 24h average. Elevated readings historically precede volatility; VPIN says nothing about direction.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/flow"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_options_flow",
+  {
+    title: "Options tape: biggest prints and premium flow (BTC + ETH)",
+    description:
+      "Call this when the user asks what big options players are buying, about block trades, or whether call or put premium dominates today. Returns 24h call vs put premium bought, the block-trade share, and the largest prints of the last 48 hours with strikes, premium and IV. Updated every 15 minutes.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/options-flow"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_slippage",
+  {
+    title: "Live execution cost: what a market order really costs",
+    description:
+      "Call this when the user asks how much slippage a trade of a given size would face, how thick the books are, or which major perp market is thinnest right now. Returns live cost ladders in basis points for $10K to $5M market orders across 8 major perpetuals, both sides, from the full visible order book. Excludes fees; null = the book cannot absorb that size.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/slippage"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
 }
