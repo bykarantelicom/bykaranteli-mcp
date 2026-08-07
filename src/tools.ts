@@ -515,4 +515,58 @@ server.registerTool(
     }
   },
 );
+
+server.registerTool(
+  "get_fomc_impact",
+  {
+    title: "Measured FOMC impact on Bitcoin",
+    description:
+      "Call this when the user asks what Bitcoin does on Fed days, how FOMC statements move crypto, or when the next FOMC meeting is. Returns per-statement 5/30/60-minute BTC reactions measured from a minute-resolution record, the average move versus a normal half hour, the up/down split (near a coin flip), and the next meeting date. Description, not prediction.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/events"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_liquidation_cascades",
+  {
+    title: "Auto-detected liquidation cascades (forensic case file)",
+    description:
+      "Call this when the user asks what caused a recent crash or flush, about liquidation cascades, or who got liquidated. Returns auto-detected cascade incidents: when, total notional flushed, long/short split, which coins led, and BTC's move during the window. Totals are an honestly-labeled lower bound from a real liquidation tape.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/incidents"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_open_interest",
+  {
+    title: "Intraday open interest and leverage regimes (10 major perps)",
+    description:
+      "Call this when the user asks whether leverage is entering or leaving the market, about open interest changes, or whether longs or shorts are building in a major coin. Returns 5-minute-resolution OI with 24h OI and price deltas and a four-regime read per symbol: longs building, shorts building, long squeeze, short squeeze, or quiet.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/oi"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
 }

@@ -53,6 +53,9 @@ Requires Node.js 18 or newer.
 | `get_flow_toxicity` | "Is toxic order flow building?", "What is BTC's VPIN right now?" |
 | `get_options_flow` | "What are the big options players buying?", "Any block trades today?" |
 | `get_slippage` | "How much slippage on a $1M market order?", "Which book is thinnest?" |
+| `get_fomc_impact` | "What does BTC do on Fed days?", "When is the next FOMC meeting?" |
+| `get_liquidation_cascades` | "What caused that flush?", "Who got liquidated this week?" |
+| `get_open_interest` | "Is leverage entering the market?", "Are shorts building in XRP?" |
 
 All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL to the human-readable page. Symbols accept both `BTCUSDT` and bare `BTC`.
 
