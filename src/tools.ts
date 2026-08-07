@@ -569,4 +569,22 @@ server.registerTool(
     }
   },
 );
+
+server.registerTool(
+  "get_psi_charge",
+  {
+    title: "PsiCharge liquidity state (proprietary model, outcomes published)",
+    description:
+      "Call this when the user asks about the market's hidden liquidity state, PsiCharge, or whether parked money is deploying or stress is unwinding. Returns the current Psi score (0-100), state (superposition = charge building, collapse = low-stress discharge, purge = high-stress discharge and historically the most consistent risk-off state, ground = ordinary), stress locality, recent alarms and the year-split measured scorecard. Inputs are proprietary; outcomes are always published. Not a trade signal, not a crash predictor.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/charge"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
 }

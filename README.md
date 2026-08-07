@@ -56,6 +56,7 @@ Requires Node.js 18 or newer.
 | `get_fomc_impact` | "What does BTC do on Fed days?", "When is the next FOMC meeting?" |
 | `get_liquidation_cascades` | "What caused that flush?", "Who got liquidated this week?" |
 | `get_open_interest` | "Is leverage entering the market?", "Are shorts building in XRP?" |
+| `get_psi_charge` | "What liquidity state is the market in?", "Is parked money deploying?" |
 
 All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL to the human-readable page. Symbols accept both `BTCUSDT` and bare `BTC`.
 
