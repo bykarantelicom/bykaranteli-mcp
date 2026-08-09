@@ -2,7 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, Fear & Greed, BTC dominance and a verified signal track record.
 
-Backed by the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX and BingX).
+20 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX and BingX).
+
+## Hosted endpoint (no install)
+
+Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
+assistant. Same 20 tools, nothing to install, no key.
 
 ## Quick start
 
@@ -83,3 +88,11 @@ node dist/index.js   # speaks MCP over stdio
 ## License
 
 MIT. Attribution appreciated: "ByKaranteli (bykaranteli.com)".
+
+## Paid depth (optional)
+
+The 20 tools above are free and stay free. For recorded history and raw records
+beyond the live snapshots, bykaranteli.com also exposes pay-per-call x402
+endpoints (USDC on Solana or Base, priced per call, no account):
+<https://bykaranteli.com/developers#x402> · machine catalog:
+<https://bykaranteli.com/api/x402>

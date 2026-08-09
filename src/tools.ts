@@ -2,21 +2,27 @@
  * Tool registrations for the ByKaranteli MCP server, transport-agnostic.
  * The stdio bin (index.ts) and the hosted Streamable HTTP endpoint on
  * bykaranteli.com both call registerByKaranteliTools on their own server
- * instance, so the 10 tools have exactly one definition.
+ * instance, so all 20 tools have exactly one definition.
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod/v4";
 
 export type RegisterOptions = {
-  /** Override the public API origin (hosted endpoint uses the internal one). */
+  /** Override the API origin used for OUTBOUND fetches (the hosted endpoint
+   * points this at the container-internal origin). */
   baseUrl?: string;
+  /** Origin used in citations returned to the caller. Defaults to baseUrl.
+   * The hosted endpoint must set this, otherwise every response cites the
+   * container-internal address, which is useless to the agent reading it. */
+  publicUrl?: string;
   /** Version string for the outbound user-agent. */
   version?: string;
 };
 
 export function registerByKaranteliTools(server: McpServer, options?: RegisterOptions): void {
   const BASE_URL = (options?.baseUrl ?? process.env.BYKARANTELI_BASE_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
+  const PUBLIC_URL = (options?.publicUrl ?? process.env.BYKARANTELI_PUBLIC_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
   const USER_AGENT = `bykaranteli-mcp/${options?.version ?? "dev"} (+https://github.com/bykarantelicom/bykaranteli-mcp)`;
   const TIMEOUT_MS = 15_000;
 
@@ -107,7 +113,7 @@ server.registerTool(
               explainer: euphoria.explainer,
             }
           : undefined,
-        source: `${BASE_URL}/indices`,
+        source: `${PUBLIC_URL}/indices`,
       });
     } catch (err) {
       return fail(err);
@@ -147,8 +153,8 @@ server.registerTool(
       );
       return ok({
         rows: filtered.slice(0, 400),
-        note: "Recorded from public exchange streams; totals are a floor (Binance throttles its stream). Live 24h view: " + BASE_URL + "/liquidations",
-        source: `${BASE_URL}/liquidations`,
+        note: "Recorded from public exchange streams; totals are a floor (Binance throttles its stream). Live 24h view: " + PUBLIC_URL + "/liquidations",
+        source: `${PUBLIC_URL}/liquidations`,
       });
     } catch (err) {
       return fail(err);
@@ -178,7 +184,7 @@ server.registerTool(
       return ok({
         rows: filtered.slice(0, (days ?? 10) * (asset ? 1 : 2)),
         note: "Finalized US trading days only; a positive net_inflow_usd means the funds bought more of the asset than they sold that day.",
-        source: `${BASE_URL}/etf`,
+        source: `${PUBLIC_URL}/etf`,
       });
     } catch (err) {
       return fail(err);
@@ -215,9 +221,9 @@ server.registerTool(
             note: `${want} is not in the top-30 heatmap set. Tracked symbols: ${d.rows.map((r) => r.symbol).join(", ")}`,
           });
         }
-        return ok({ generatedAt: d.generatedAt, row, source: `${BASE_URL}/heatmap` });
+        return ok({ generatedAt: d.generatedAt, row, source: `${PUBLIC_URL}/heatmap` });
       }
-      return ok({ ...d, source: `${BASE_URL}/heatmap` });
+      return ok({ ...d, source: `${PUBLIC_URL}/heatmap` });
     } catch (err) {
       return fail(err);
     }
@@ -236,7 +242,7 @@ server.registerTool(
   async () => {
     try {
       const d = (await fetchJson("/api/public/funding-arb")) as Record<string, unknown>;
-      return ok({ ...d, source: `${BASE_URL}/funding-arb` });
+      return ok({ ...d, source: `${PUBLIC_URL}/funding-arb` });
     } catch (err) {
       return fail(err);
     }
@@ -287,13 +293,13 @@ server.registerTool(
             note: `${want} is not in the tracked pressure universe right now.`,
           });
         }
-        return ok({ generatedAt: d.generatedAt, item: slim(item), source: `${BASE_URL}/pressure` });
+        return ok({ generatedAt: d.generatedAt, item: slim(item), source: `${PUBLIC_URL}/pressure` });
       }
       return ok({
         generatedAt: d.generatedAt,
         items: d.items.slice(0, limit ?? 20).map(slim),
         totalTracked: d.items.length,
-        source: `${BASE_URL}/pressure`,
+        source: `${PUBLIC_URL}/pressure`,
       });
     } catch (err) {
       return fail(err);
@@ -313,7 +319,7 @@ server.registerTool(
   async () => {
     try {
       const d = (await fetchJson("/api/public/top-movers")) as Record<string, unknown>;
-      return ok({ ...d, source: `${BASE_URL}/top-movers` });
+      return ok({ ...d, source: `${PUBLIC_URL}/top-movers` });
     } catch (err) {
       return fail(err);
     }
@@ -332,7 +338,7 @@ server.registerTool(
   async () => {
     try {
       const d = (await fetchJson("/api/public/recent")) as Record<string, unknown>;
-      return ok({ ...d, source: `${BASE_URL}/signals` });
+      return ok({ ...d, source: `${PUBLIC_URL}/signals` });
     } catch (err) {
       return fail(err);
     }
@@ -371,7 +377,7 @@ server.registerTool(
           return ok({
             symbol: want,
             window_days: w,
-            note: `No closed signals recorded for ${want} in the last ${w} days (or the symbol is not tracked). Try window_days: 180, or check ${BASE_URL}/symbols/${want}.`,
+            note: `No closed signals recorded for ${want} in the last ${w} days (or the symbol is not tracked). Try window_days: 180, or check ${PUBLIC_URL}/symbols/${want}.`,
           });
         }
         throw err;
@@ -381,7 +387,7 @@ server.registerTool(
       return ok({
         ...d,
         daily_points: Array.isArray(daily) ? daily.slice(-30) : daily,
-        source: `${BASE_URL}/symbols/${want}`,
+        source: `${PUBLIC_URL}/symbols/${want}`,
       });
     } catch (err) {
       return fail(err);
@@ -401,7 +407,7 @@ server.registerTool(
   async () => {
     try {
       const d = (await fetchJson("/api/v1/public/leaderboard")) as Record<string, unknown>;
-      return ok({ ...d, source: `${BASE_URL}/leaderboard` });
+      return ok({ ...d, source: `${PUBLIC_URL}/leaderboard` });
     } catch (err) {
       return fail(err);
     }
