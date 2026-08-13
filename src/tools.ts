@@ -593,4 +593,62 @@ server.registerTool(
     }
   },
 );
+server.registerTool(
+  "get_altseason",
+  {
+    title: "Altcoin Season Index (live + recorded history)",
+    description:
+      "Call this when the user asks whether it is altseason, how altcoins are doing against Bitcoin, or about market rotation. Returns the live Altcoin Season Index (share of the top 50 Binance perpetual altcoins beating BTC over the trailing 90 days; >=75 altseason, <=25 bitcoin season), the strongest and weakest large alts, and the recorded daily history (never reconstructed).",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/altseason"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_quantum_exposure",
+  {
+    title: "Quantum-exposed Bitcoin (daily first-party measurement)",
+    description:
+      "Call this when the user asks how much Bitcoin is vulnerable to a quantum computer, about quantum-exposed supply, P2PK coins, or Satoshi-era exposure. Returns the latest daily measurement from ByKaranteli's own Bitcoin Core node: exposed BTC and its share of held value and UTXO count, composition by script family, dormancy cohorts, the dormant-P2PK watch set, and provenance hashes (base_height, base_hash, txoutset_hash) so any figure can be re-verified against any node.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(await fetchJson("/api/public/quantum"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_metric_context",
+  {
+    title: "Historical context for any recorded metric (conditional distribution)",
+    description:
+      "Call this when the user asks whether a metric's current reading is high or low, or what happened after similar readings. Buckets today's value against the metric's own recorded daily history and returns the median forward BTC return and up-share per bucket at +1/+3/+7 days, with the all-days base rate alongside. Honesty rules: buckets under 30 days are suppressed, and most metrics do NOT separate from the base rate; the interpretation says so plainly. History, not a forecast. Metrics include coinbase_premium_pct, kraken_btc_premium_pct, dvol_btc, fear_greed, funding_btc_daily_pct, etf_btc_net_flow_usd, vpin_btc, altseason_index, stablecoin_total_mcap_busd, fred_dff, fred_dgs10, fred_walcl_busd, fred_rrp_busd and the btc_* network series.",
+    inputSchema: {
+      metric: z
+        .string()
+        .regex(/^[a-z0-9_]{2,50}$/)
+        .describe("Metric key, e.g. coinbase_premium_pct, fear_greed, altseason_index, stablecoin_total_mcap_busd."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ metric }) => {
+    try {
+      return ok(await fetchJson(`/api/public/context?metric=${encodeURIComponent(metric)}`));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
 }
