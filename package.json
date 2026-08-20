@@ -6,7 +6,7 @@
   "bin": {
     "bykaranteli-mcp": "dist/index.js"
   },
-  "main": "dist/index.js",
+  "main": "dist/tools.js",
   "files": [
     "dist",
     "README.md",

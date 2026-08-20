@@ -44,7 +44,10 @@ async function fetchJson(path: string): Promise<unknown> {
       headers: { accept: "application/json", "user-agent": USER_AGENT },
     });
     if (!res.ok) {
-      throw new Error(`${path} returned HTTP ${res.status}`);
+      /* Carry the route's own error body (audit P3 #412): "HTTP 400" alone
+       * hid the actual reason (unknown metric, bad symbol...). */
+      const body = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 240);
+      throw new Error(`${path} returned HTTP ${res.status}${body ? `: ${body}` : ""}`);
     }
     return await res.json();
   } finally {
@@ -57,16 +60,31 @@ type ToolResult = {
   isError?: boolean;
 };
 
+/* Every answer carries where it came from and when (README promise; audit
+ * P3 #416): routes that already emit these keep their own values. */
+function withProvenance(data: unknown, path: string): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const record = data as Record<string, unknown>;
+  return {
+    ...record,
+    generatedAt: typeof record.generatedAt === "string" ? record.generatedAt : new Date().toISOString(),
+    source: typeof record.source === "string" ? record.source : `${PUBLIC_URL}${path.replace(/^\/api\/public/, "").split("?")[0] || "/"}`,
+  };
+}
+
 function ok(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
 }
 
 function fail(err: unknown): ToolResult {
   const message = err instanceof Error ? err.message : String(err);
+  const permanent = /returned HTTP 4\d\d/.test(message);
   const text =
     err instanceof InputError
       ? `Invalid input: ${message}`
-      : `Error fetching data from bykaranteli.com: ${message}. The API is free and unauthenticated; transient errors usually resolve on retry.`;
+      : permanent
+        ? `Error fetching data from bykaranteli.com: ${message}. This is a permanent error for these inputs (wrong parameter or route), not a transient one; retrying will not help.`
+        : `Error fetching data from bykaranteli.com: ${message}. The API is free and unauthenticated; transient errors usually resolve on retry.`;
   return {
     content: [{ type: "text", text }],
     isError: true,
@@ -126,7 +144,7 @@ server.registerTool(
   {
     title: "Crypto liquidations: daily long/short totals per symbol and exchange",
     description:
-      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own Binance, Bybit and OKX stream collectors (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
+      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own Binance, Bybit, OKX, Gate and HTX stream collectors (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
     inputSchema: {
       symbol: z
         .string()
@@ -148,8 +166,10 @@ server.registerTool(
       const wantDays = days ?? 7;
       const dates = [...new Set(rows.map((r) => String(r.date)))].sort().reverse().slice(0, wantDays);
       const dateSet = new Set(dates);
+      /* Bare "BTC" is accepted like every other tool (audit P3 #414). */
+      const wantSymbol = symbol ? (symbol.endsWith("USDT") ? symbol : `${symbol}USDT`) : undefined;
       const filtered = rows.filter(
-        (r) => dateSet.has(String(r.date)) && (!symbol || String(r.symbol).toUpperCase() === symbol),
+        (r) => dateSet.has(String(r.date)) && (!wantSymbol || String(r.symbol).toUpperCase() === wantSymbol),
       );
       /* Totals are computed over EVERY matching row before the row cap. A
        * symbol-less 7-day call matches ~7,000 rows; returning only the first
@@ -252,9 +272,9 @@ server.registerTool(
 server.registerTool(
   "get_funding_heatmap",
   {
-    title: "Funding rates across top-30 Binance perps",
+    title: "Funding rates across the ~30 most traded Binance perps",
     description:
-      "Call this when the user asks for the full current funding table across the top-30 Binance perp universe, or the funding rate of one specific coin. For a pre-ranked top-10 of the most extreme funding rates, use get_top_movers instead. Returns per-symbol funding rate (per settlement interval), 24h open interest change and 24h price change for the top-30 Binance USDT-M perpetuals. Positive funding means longs pay shorts.",
+      "Call this when the user asks for the full current funding table across the ~30 most traded Binance perps (28-30 rows; contracts without a live funding print are skipped), or the funding rate of one specific coin. For a pre-ranked top-10 of the most extreme funding rates, use get_top_movers instead. Returns per-symbol funding rate (per settlement interval), 24h open interest change and 24h price change for the most traded Binance USDT-M perpetuals. Positive funding means longs pay shorts.",
     inputSchema: {
       symbol: z
         .string()
@@ -275,7 +295,7 @@ server.registerTool(
         if (!row) {
           return ok({
             generatedAt: d.generatedAt,
-            note: `${want} is not in the top-30 heatmap set. Tracked symbols: ${d.rows.map((r) => r.symbol).join(", ")}`,
+            note: `${want} is not in the heatmap set. Tracked symbols: ${d.rows.map((r) => r.symbol).join(", ")}`,
           });
         }
         return ok({ generatedAt: d.generatedAt, row, source: `${PUBLIC_URL}/heatmap` });
@@ -482,7 +502,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/cot"));
+      return ok(withProvenance(await fetchJson("/api/public/cot"), "/api/public/cot"));
     } catch (err) {
       return fail(err);
     }
@@ -500,7 +520,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/options"));
+      return ok(withProvenance(await fetchJson("/api/public/options"), "/api/public/options"));
     } catch (err) {
       return fail(err);
     }
@@ -518,7 +538,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/premium"));
+      return ok(withProvenance(await fetchJson("/api/public/premium"), "/api/public/premium"));
     } catch (err) {
       return fail(err);
     }
@@ -536,7 +556,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/flow"));
+      return ok(withProvenance(await fetchJson("/api/public/flow"), "/api/public/flow"));
     } catch (err) {
       return fail(err);
     }
@@ -554,7 +574,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/options-flow"));
+      return ok(withProvenance(await fetchJson("/api/public/options-flow"), "/api/public/options-flow"));
     } catch (err) {
       return fail(err);
     }
@@ -572,7 +592,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/slippage"));
+      return ok(withProvenance(await fetchJson("/api/public/slippage"), "/api/public/slippage"));
     } catch (err) {
       return fail(err);
     }
@@ -590,7 +610,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/events"));
+      return ok(withProvenance(await fetchJson("/api/public/events"), "/api/public/events"));
     } catch (err) {
       return fail(err);
     }
@@ -608,7 +628,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/incidents"));
+      return ok(withProvenance(await fetchJson("/api/public/incidents"), "/api/public/incidents"));
     } catch (err) {
       return fail(err);
     }
@@ -626,7 +646,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/oi"));
+      return ok(withProvenance(await fetchJson("/api/public/oi"), "/api/public/oi"));
     } catch (err) {
       return fail(err);
     }
@@ -644,7 +664,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/charge"));
+      return ok(withProvenance(await fetchJson("/api/public/charge"), "/api/public/charge"));
     } catch (err) {
       return fail(err);
     }
@@ -661,7 +681,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/altseason"));
+      return ok(withProvenance(await fetchJson("/api/public/altseason"), "/api/public/altseason"));
     } catch (err) {
       return fail(err);
     }
@@ -679,7 +699,7 @@ server.registerTool(
   },
   async () => {
     try {
-      return ok(await fetchJson("/api/public/quantum"));
+      return ok(withProvenance(await fetchJson("/api/public/quantum"), "/api/public/quantum"));
     } catch (err) {
       return fail(err);
     }
@@ -702,7 +722,7 @@ server.registerTool(
   },
   async ({ metric }) => {
     try {
-      return ok(await fetchJson(`/api/public/context?metric=${encodeURIComponent(metric)}`));
+      return ok(withProvenance(await fetchJson(`/api/public/context?metric=${encodeURIComponent(metric)}`), `/api/public/context?metric=${encodeURIComponent(metric)}`));
     } catch (err) {
       return fail(err);
     }
