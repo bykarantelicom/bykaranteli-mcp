@@ -7,7 +7,7 @@ MCP (Model Context Protocol) server for **live crypto derivatives data**: fundin
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 20 tools, nothing to install, no key.
+assistant. Same 23 tools, nothing to install, no key.
 
 ## Quick start
 
@@ -91,7 +91,7 @@ MIT. Attribution appreciated: "ByKaranteli (bykaranteli.com)".
 
 ## Paid depth (optional)
 
-The 20 tools above are free and stay free. For recorded history and raw records
+The 23 tools above are free and stay free. For recorded history and raw records
 beyond the live snapshots, bykaranteli.com also exposes pay-per-call x402
 endpoints (USDC on Solana or Base, priced per call, no account):
 <https://bykaranteli.com/developers#x402> · machine catalog:
