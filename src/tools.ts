@@ -151,9 +151,66 @@ server.registerTool(
       const filtered = rows.filter(
         (r) => dateSet.has(String(r.date)) && (!symbol || String(r.symbol).toUpperCase() === symbol),
       );
+      /* Totals are computed over EVERY matching row before the row cap. A
+       * symbol-less 7-day call matches ~7,000 rows; returning only the first
+       * 400 (one day, alphabetically) used to understate the weekly total
+       * 11.5x with no warning in the payload (audit 2026-08-20 P1-67). */
+      const num = (v: unknown): number => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const byDate = new Map<string, { date: string; long_liquidations_usd: number; short_liquidations_usd: number; events: number; rows: number }>();
+      let longTotal = 0;
+      let shortTotal = 0;
+      let eventsTotal = 0;
+      for (const r of filtered) {
+        const date = String(r.date);
+        const long = num(r.long_liquidations_usd);
+        const short = num(r.short_liquidations_usd);
+        const events = num(r.events);
+        longTotal += long;
+        shortTotal += short;
+        eventsTotal += events;
+        const day = byDate.get(date) ?? { date, long_liquidations_usd: 0, short_liquidations_usd: 0, events: 0, rows: 0 };
+        day.long_liquidations_usd += long;
+        day.short_liquidations_usd += short;
+        day.events += events;
+        day.rows += 1;
+        byDate.set(date, day);
+      }
+      const MAX_ROWS = 400;
+      /* Largest rows first within the cap, newest day first. */
+      const ordered = [...filtered].sort((a, b) => {
+        const dd = String(b.date).localeCompare(String(a.date));
+        if (dd !== 0) return dd;
+        return (num(b.long_liquidations_usd) + num(b.short_liquidations_usd)) - (num(a.long_liquidations_usd) + num(a.short_liquidations_usd));
+      });
+      const truncated = ordered.length > MAX_ROWS;
+      const baseNote = "Recorded from public exchange streams; totals are a floor (Binance throttles its stream). Live 24h view: " + PUBLIC_URL + "/liquidations";
       return ok({
-        rows: filtered.slice(0, 400),
-        note: "Recorded from public exchange streams; totals are a floor (Binance throttles its stream). Live 24h view: " + PUBLIC_URL + "/liquidations",
+        summary: {
+          window_days: wantDays,
+          dates_covered: dates,
+          totals: {
+            long_liquidations_usd: Math.round(longTotal),
+            short_liquidations_usd: Math.round(shortTotal),
+            total_liquidations_usd: Math.round(longTotal + shortTotal),
+            events: eventsTotal,
+            rows_matched: filtered.length,
+          },
+          by_date: [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date)).map((d) => ({
+            ...d,
+            long_liquidations_usd: Math.round(d.long_liquidations_usd),
+            short_liquidations_usd: Math.round(d.short_liquidations_usd),
+          })),
+        },
+        rows: ordered.slice(0, MAX_ROWS),
+        rows_returned: Math.min(ordered.length, MAX_ROWS),
+        rows_matched: filtered.length,
+        truncated,
+        note: truncated
+          ? `rows is capped at ${MAX_ROWS} of ${filtered.length} matching rows (largest first). Use summary.totals and summary.by_date for complete figures, or pass a symbol filter. ` + baseNote
+          : baseNote,
         source: `${PUBLIC_URL}/liquidations`,
       });
     } catch (err) {
