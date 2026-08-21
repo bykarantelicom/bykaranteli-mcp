@@ -728,4 +728,190 @@ server.registerTool(
     }
   },
 );
+
+server.registerTool(
+  "get_theme_indices",
+  {
+    title: "Crypto narrative indices (AI, RWA, DePIN, meme, L1, L2, DeFi, quantum)",
+    description:
+      "Call this when the user asks which crypto narrative or sector is leading, about rotation between AI, RWA, DePIN, memecoins, layer 1, layer 2, DeFi or quantum coins, or for a theme index. Returns eight equal-weight fixed-basket indices rebased to 100 on 2025-01-01 with 1d/7d/30d/90d/YTD returns, vs BTC, and the member lists; daily points are omitted unless include_points is true.",
+    inputSchema: { include_points: z.boolean().optional().describe("boolean, optional: include the daily index points (large)") },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const path = args.include_points === true ? "/api/public/themes" : "/api/public/themes?points=0";
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_factor_board",
+  {
+    title: "Factor board: what followed days like today across recorded metrics",
+    description:
+      "Call this when the user asks which indicators currently sit in an unusual band, whether a metric's current level historically preceded BTC moves, or for a cross-metric conditional overview. Returns every recorded metric in its historical band with the median 7-day BTC move that followed versus the base rate, with an n >= 30 gate; distributions, not forecasts.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(withProvenance(await fetchJson("/api/public/factors"), "/api/public/factors"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_venue_markets",
+  {
+    title: "Exchange coverage: OI, volume, funding and pegs across 43 exchanges",
+    description:
+      "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across 56 feeds on 43 exchanges; pass symbol for one coin's per-venue rows.",
+    inputSchema: { symbol: z.string().optional().describe("string, optional base asset, e.g. BTC") },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const path = args.symbol ? `/api/public/venues/markets?symbol=${encodeURIComponent(args.symbol.toUpperCase())}` : "/api/public/venues/markets";
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_lead_lag",
+  {
+    title: "Venue lead-lag: who moves first (Coinbase, Kraken, Binance)",
+    description:
+      "Call this when the user asks which exchange leads price discovery or whether spot or perp moves first. Returns per-pair daily cross-correlations of one-minute returns at lags -3..+3 and the lead asymmetry, with the share of days each venue led.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(withProvenance(await fetchJson("/api/public/venues/lead-lag"), "/api/public/venues/lead-lag"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_iv_surface",
+  {
+    title: "Options implied-volatility surface and 25-delta skew",
+    description:
+      "Call this when the user asks about implied volatility by strike or expiry, skew, put versus call IV, term structure of IV, or whether downside protection is expensive. Returns the IV surface (expiry x moneyness), per-expiry ATM / 25-delta put and call IV, skew and butterfly, and the constant-30d history, from the daily Deribit chain.",
+    inputSchema: { currency: z.string().optional().describe("BTC or ETH, default BTC") },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const path = `/api/public/options/surface?currency=${(args.currency ?? "BTC").toUpperCase() === "ETH" ? "ETH" : "BTC"}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_whale_tape",
+  {
+    title: "Whale tape: $1M+ aggressive prints with 24h buy share",
+    description:
+      "Call this when the user asks about whale trades, large market orders, or whether big players are buying or selling right now. Returns recent $1M+ aggressive prints recorded live from our own sockets and 24h aggregates with the buy share.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(withProvenance(await fetchJson("/api/public/whales"), "/api/public/whales"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_correlations",
+  {
+    title: "Crypto correlation matrix",
+    description:
+      "Call this when the user asks how correlated two coins are, for decorrelated pairs, or how tightly alts track BTC. Returns the 30-day rolling Pearson correlation matrix of daily returns across the top perpetuals.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(withProvenance(await fetchJson("/api/public/correlations"), "/api/public/correlations"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_new_listings",
+  {
+    title: "New and delisted perpetual contracts",
+    description:
+      "Call this when the user asks what new perpetuals were listed, which exchange listed a coin first, or about delistings. Returns listings and delistings across six exchanges from the hourly scan.",
+    inputSchema: { days: z.number().optional().describe("number, optional window in days, default 30") },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const path = `/api/public/listings?days=${args.days && args.days > 0 ? Math.floor(args.days) : 30}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_macro_liquidity",
+  {
+    title: "Macro liquidity: Fed funds, 10y, balance sheet, RRP, stablecoin supply",
+    description:
+      "Call this when the user asks about macro liquidity, the Fed balance sheet, reverse repo, rates or stablecoin supply in relation to crypto. Returns the recorded daily series and latest values.",
+    inputSchema: { days: z.number().optional().describe("number, optional window in days, default 365") },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const path = `/api/public/macro?days=${args.days && args.days > 0 ? Math.floor(args.days) : 365}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_network_health",
+  {
+    title: "Bitcoin network health from our own node",
+    description:
+      "Call this when the user asks about Bitcoin hashrate, difficulty, fees or mempool congestion. Returns the recorded daily series and latest values measured on ByKaranteli's own node.",
+    inputSchema: { days: z.number().optional().describe("number, optional window in days, default 365") },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const path = `/api/public/network?days=${args.days && args.days > 0 ? Math.floor(args.days) : 365}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
 }
