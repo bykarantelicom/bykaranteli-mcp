@@ -2,12 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, Fear & Greed, BTC dominance and a verified signal track record.
 
-20 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX and BingX).
+33 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX and BingX).
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 23 tools, nothing to install, no key.
+assistant. Same 33 tools, nothing to install, no key.
 
 ## Quick start
 
@@ -62,6 +62,16 @@ Requires Node.js 18 or newer.
 | `get_liquidation_cascades` | "What caused that flush?", "Who got liquidated this week?" |
 | `get_open_interest` | "Is leverage entering the market?", "Are shorts building in XRP?" |
 | `get_psi_charge` | "What liquidity state is the market in?", "Is parked money deploying?" |
+| `get_theme_indices` | "Which crypto narrative is leading: AI, RWA, DePIN, memes, L2s, DeFi?" |
+| `get_factor_board` | "Which indicators sit in an unusual band today, and what followed historically?" |
+| `get_venue_markets` | "Total BTC open interest across exchanges?", "What is the DEX share of perp OI?", "Is USDT off peg anywhere?" |
+| `get_lead_lag` | "Does Coinbase or Binance move first?" |
+| `get_iv_surface` | "What is BTC implied vol by expiry?", "Is downside protection expensive (skew)?" |
+| `get_whale_tape` | "Are whales buying or selling right now?" |
+| `get_correlations` | "How correlated is SOL to BTC over 30 days?" |
+| `get_new_listings` | "Which perpetuals were listed this week, and where first?" |
+| `get_macro_liquidity` | "What is the Fed balance sheet / RRP / stablecoin supply doing?" |
+| `get_network_health` | "Bitcoin hashrate, difficulty, fees, mempool right now?" |
 
 All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL to the human-readable page. Symbols accept both `BTCUSDT` and bare `BTC`.
 
@@ -91,7 +101,7 @@ MIT. Attribution appreciated: "ByKaranteli (bykaranteli.com)".
 
 ## Paid depth (optional)
 
-The 23 tools above are free and stay free. For recorded history and raw records
+The 33 tools above are free and stay free. For recorded history and raw records
 beyond the live snapshots, bykaranteli.com also exposes pay-per-call x402
 endpoints (USDC on Solana or Base, priced per call, no account):
 <https://bykaranteli.com/developers#x402> · machine catalog:
