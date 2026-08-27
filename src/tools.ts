@@ -46,7 +46,7 @@ async function fetchJson(path: string): Promise<unknown> {
     if (!res.ok) {
       /* Carry the route's own error body (audit P3 #412): "HTTP 400" alone
        * hid the actual reason (unknown metric, bad symbol...). */
-      const body = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 240);
+      const body = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 2000);
       throw new Error(`${path} returned HTTP ${res.status}${body ? `: ${body}` : ""}`);
     }
     return await res.json();
@@ -144,7 +144,7 @@ server.registerTool(
   {
     title: "Crypto liquidations: daily long/short totals per symbol and exchange",
     description:
-      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own Binance, Bybit, OKX, Gate and HTX stream collectors (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
+      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own Binance, Bybit, OKX, Gate, HTX and dYdX stream collectors (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
     inputSchema: {
       symbol: z
         .string()
@@ -258,9 +258,24 @@ server.registerTool(
       };
       const rows = Array.isArray(d.rows) ? d.rows : [];
       const filtered = rows.filter((r) => !asset || String(r.asset) === asset);
+      /* Window by DATE like get_liquidations (audit D14-03): the old row-count
+       * slice could cut one asset's day in half and reported no totals and no
+       * truncation flag, so partial sums read as full ones. */
+      const wantDays = days ?? 10;
+      const dates = [...new Set(filtered.map((r) => String(r.date)))].sort().reverse().slice(0, wantDays);
+      const dateSet = new Set(dates);
+      const windowed = filtered.filter((r) => dateSet.has(String(r.date)));
+      const totals: Record<string, number> = {};
+      for (const r of windowed) {
+        const a = String(r.asset);
+        totals[a] = (totals[a] ?? 0) + (Number(r.net_inflow_usd) || 0);
+      }
       return ok({
-        rows: filtered.slice(0, (days ?? 10) * (asset ? 1 : 2)),
-        note: "Finalized US trading days only; a positive net_inflow_usd means the funds bought more of the asset than they sold that day.",
+        rows: windowed,
+        window_days: dates.length,
+        window_net_inflow_usd: totals,
+        truncated: dates.length < new Set(filtered.map((r) => String(r.date))).size,
+        note: "Finalized US trading days only; a positive net_inflow_usd means the funds bought more of the asset than they sold that day. window_net_inflow_usd sums the returned window per asset.",
         source: `${PUBLIC_URL}/etf`,
       });
     } catch (err) {
@@ -464,6 +479,7 @@ server.registerTool(
       return ok({
         ...d,
         daily_points: Array.isArray(daily) ? daily.slice(-30) : daily,
+        daily_points_truncated: Array.isArray(daily) ? daily.length > 30 : false,
         source: `${PUBLIC_URL}/symbols/${want}`,
       });
     } catch (err) {
@@ -864,7 +880,7 @@ server.registerTool(
     title: "New and delisted perpetual contracts",
     description:
       "Call this when the user asks what new perpetuals were listed, which exchange listed a coin first, or about delistings. Returns listings and delistings across six exchanges from the hourly scan.",
-    inputSchema: { days: z.number().optional().describe("number, optional window in days, default 30") },
+    inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Window in days, 1-30 (default 30). Longer listing history is the paid x402 dataset.") },
     annotations: READ_ONLY,
   },
   async (args) => {
@@ -883,7 +899,7 @@ server.registerTool(
     title: "Macro liquidity: Fed funds, 10y, balance sheet, RRP, stablecoin supply",
     description:
       "Call this when the user asks about macro liquidity, the Fed balance sheet, reverse repo, rates or stablecoin supply in relation to crypto. Returns the recorded daily series and latest values.",
-    inputSchema: { days: z.number().optional().describe("number, optional window in days, default 365") },
+    inputSchema: { days: z.number().int().min(1).max(730).optional().describe("Window in days, 1-730 (default 365).") },
     annotations: READ_ONLY,
   },
   async (args) => {
@@ -902,13 +918,43 @@ server.registerTool(
     title: "Bitcoin network health from our own node",
     description:
       "Call this when the user asks about Bitcoin hashrate, difficulty, fees or mempool congestion. Returns the recorded daily series and latest values measured on ByKaranteli's own node.",
-    inputSchema: { days: z.number().optional().describe("number, optional window in days, default 365") },
+    inputSchema: { days: z.number().int().min(1).max(730).optional().describe("Window in days, 1-730 (default 365).") },
     annotations: READ_ONLY,
   },
   async (args) => {
     try {
       const path = `/api/public/network?days=${args.days && args.days > 0 ? Math.floor(args.days) : 365}`;
       return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_liqmap",
+  {
+    title: "LiqMap: estimated liquidation clusters with real prints overlaid",
+    description:
+      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the public LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from six venues. Public tier serves the 24h view; other intervals are a member feature at the source page.",
+    inputSchema: {
+      symbol: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z0-9]{2,20}$/)
+        .optional()
+        .describe("Symbol like BTCUSDT (bare BTC accepted). Default BTCUSDT."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol }: { symbol?: string }) => {
+    try {
+      const raw = symbol ?? "BTCUSDT";
+      const sym = raw.endsWith("USDT") ? raw : `${raw}USDT`;
+      const path = `/api/liqmap/public?symbol=${encodeURIComponent(sym)}&timeframe=24h`;
+      const data = await fetchJson(path);
+      return ok({ ...(data as Record<string, unknown>), source: `${PUBLIC_URL}/liqmap/${sym.replace(/USDT$/, "").toLowerCase()}` });
     } catch (err) {
       return fail(err);
     }

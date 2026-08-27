@@ -54,12 +54,29 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 23, names.join(","));
+check("tools/list count", names.length === 34, names.join(","));
 check(
   "all tools annotated read-only",
   (list.result?.tools ?? []).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
   "",
 );
+
+/* D14-12: every tool gets at least one default-argument call; a tool that
+ * errors on its own defaults would otherwise ship silently broken. Runs
+ * before the targeted assertions so their deeper checks still apply. */
+const REQUIRED_ARGS = {
+  get_metric_context: { metric: "fear_greed" },
+  get_symbol_performance: { symbol: "BTCUSDT" },
+};
+for (const toolName of names) {
+  const r = await callAll(toolName, REQUIRED_ARGS[toolName] ?? {});
+  check(`call ${toolName}`, !r.isError, r.isError ? r.text.slice(0, 100).replace(/\n/g, " ") : "");
+}
+async function callAll(name, args) {
+  const r = await rpc("tools/call", { name, arguments: args });
+  const text = r.result?.content?.[0]?.text ?? "";
+  return { isError: r.isError ?? r.result?.isError ?? false, text };
+}
 
 async function call(name, args) {
   const r = await rpc("tools/call", { name, arguments: args ?? {} });
