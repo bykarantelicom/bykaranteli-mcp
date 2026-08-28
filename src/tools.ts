@@ -584,7 +584,7 @@ server.registerTool(
   {
     title: "Options tape: biggest prints and premium flow (BTC + ETH)",
     description:
-      "Call this when the user asks what big options players are buying, about block trades, or whether call or put premium dominates today. Returns 24h call vs put premium bought, the block-trade share, and the largest prints of the last 48 hours with strikes, premium and IV. Updated every 15 minutes.",
+      "Call this when the user asks what big options players are buying, about block trades, or whether call or put premium dominates today. Returns 24h call vs put premium bought, the block-trade share, and the largest prints of the last 48 hours with strikes, premium, IV and venue (Deribit or OKX). Updated every 15 minutes.",
     inputSchema: {},
     annotations: READ_ONLY,
   },
