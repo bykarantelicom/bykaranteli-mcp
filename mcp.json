@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "bykaranteli": {
+      "command": "npx",
+      "args": ["-y", "bykaranteli-mcp"]
+    },
+    "bykaranteli-remote": {
+      "url": "https://mcp.bykaranteli.com"
+    }
+  }
+}
