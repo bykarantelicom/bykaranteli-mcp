@@ -999,4 +999,33 @@ server.registerTool(
   },
 );
 
+
+server.registerTool(
+  "get_rsi_heatmap",
+  {
+    title: "RSI heatmap: Wilder RSI(14) on eight timeframes for ~580 perps",
+    description:
+      "Call this when the user asks which coins are overbought or oversold, for a crypto RSI heatmap, multi-timeframe RSI, or one contract's RSI on 15m, 1h, 4h, 12h, 1d, 3d, 1w or 1M. Returns the live board for the top-400 Binance crypto perps by volume plus every TradFi perp, with overbought/oversold counts per interval. Filter by symbol or kind (crypto|tradfi), sort by an interval.",
+    inputSchema: {
+      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,24}$/).optional().describe("One Binance symbol, e.g. BTCUSDT"),
+      kind: z.enum(["crypto", "tradfi"]).optional().describe("crypto | tradfi"),
+      sort: z.enum(["15m", "1h", "4h", "12h", "1d", "3d", "1w", "1M"]).optional().describe("Interval to sort by, descending"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol, kind, sort }: { symbol?: string; kind?: string; sort?: string }) => {
+    try {
+      const params = new URLSearchParams();
+      if (symbol) params.set("symbol", symbol);
+      if (kind) params.set("kind", kind);
+      if (sort) params.set("sort", sort);
+      const qs = params.toString();
+      const path = `/api/public/rsi${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 }
