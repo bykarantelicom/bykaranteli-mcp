@@ -7,7 +7,7 @@ MCP (Model Context Protocol) server for **live crypto derivatives data**: fundin
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 34 tools, nothing to install, no key.
+assistant. Same 35 tools, nothing to install, no key.
 
 ## Quick start
 
@@ -78,6 +78,7 @@ Requires Node.js 18 or newer.
 | `get_positioning` | "BTC long/short ratio on Binance? Are top traders net short ETH? CVD today?" |
 | `get_coverage` | "Which exchanges are behind your liquidation totals? How fresh is the data?" |
 | `get_orderbook_depth` | "Where is the biggest BTC bid wall? How deep is ETH within 2% on Coinbase vs Binance?" |
+| `get_jupiter_perps` | "How much long vs short OI is on Jupiter SOL perps? Who topped Jupiter this week? What is the JLP APR?" |
 | `get_cycle_indicators` | "Has the Pi Cycle crossed? Mayer Multiple and Puell today?" |
 | `get_altseason` | "Is it altseason?", "What is the altcoin season index?" |
 | `get_metric_context` | "Is today's funding extreme historically?", "Where does this reading sit in its distribution?" |
@@ -112,7 +113,7 @@ MIT. Attribution appreciated: "ByKaranteli (bykaranteli.com)".
 
 ## Paid depth (optional)
 
-The 34 tools above are free and stay free. For recorded history and raw records
+The 35 tools above are free and stay free. For recorded history and raw records
 beyond the live snapshots, bykaranteli.com also exposes pay-per-call x402
 endpoints (USDC on Solana or Base, priced per call, no account):
 <https://bykaranteli.com/developers#x402> · machine catalog:

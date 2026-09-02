@@ -1107,6 +1107,32 @@ server.registerTool(
 
 
 server.registerTool(
+  "get_jupiter_perps",
+  {
+    title: "Jupiter Perps (Solana): exact long/short OI, utilization, borrow rates, weekly top traders",
+    description:
+      "Call this when the user asks about Jupiter perpetuals on Solana: long versus short open interest per market (SOL, ETH, BTC) read from the on-chain custody state, pool utilization and hourly borrow rates, JLP pool AUM and APR, 24h volume, or the week's top traders by realized PnL. Pass base and history_days for the hourly OI history.",
+    inputSchema: {
+      base: z.string().trim().toUpperCase().regex(/^(SOL|ETH|BTC)$/).optional().describe("Market base: SOL, ETH or BTC"),
+      history_days: z.number().int().min(1).max(30).optional().describe("Include hourly OI history for the base, 1..30 days"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ base, history_days }: { base?: string; history_days?: number }) => {
+    try {
+      const q = new URLSearchParams();
+      if (base) q.set("base", base);
+      if (history_days) q.set("days", String(history_days));
+      const qs = q.toString();
+      const path = `/api/public/jupiter${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_coverage",
   {
     title: "Coverage registry: which venues and data types we collect, how, and how fresh",
