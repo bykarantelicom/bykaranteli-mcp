@@ -74,6 +74,7 @@ Requires Node.js 18 or newer.
 | `get_network_health` | "Bitcoin hashrate, difficulty, fees, mempool right now?" |
 | `get_tradfi_board` | "TSLA perp funding rate? Which exchanges list NVDA perps? Is the stock session open?" |
 | `get_rsi_heatmap` | "Which coins are oversold on the daily? BTC RSI on 4h and 1w?" |
+| `get_hl_whales` | "Are Hyperliquid whales net long BTC? What did the biggest accounts just flip?" |
 | `get_cycle_indicators` | "Has the Pi Cycle crossed? Mayer Multiple and Puell today?" |
 | `get_altseason` | "Is it altseason?", "What is the altcoin season index?" |
 | `get_metric_context` | "Is today's funding extreme historically?", "Where does this reading sit in its distribution?" |

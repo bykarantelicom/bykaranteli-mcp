@@ -1051,4 +1051,31 @@ server.registerTool(
   },
 );
 
+
+server.registerTool(
+  "get_hl_whales",
+  {
+    title: "Hyperliquid whale tracker: top-300 accounts, long vs short, positions, changes",
+    description:
+      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the 300 largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes.",
+    inputSchema: {
+      coin: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,24}$/).optional().describe("One coin, e.g. BTC"),
+      events: z.boolean().optional().describe("Include the last 200 position change events"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ coin, events }: { coin?: string; events?: boolean }) => {
+    try {
+      const params = new URLSearchParams();
+      if (coin) params.set("coin", coin);
+      if (events) params.set("events", "1");
+      const qs = params.toString();
+      const path = `/api/public/hyperliquid-whales${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 }
