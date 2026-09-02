@@ -1125,4 +1125,31 @@ server.registerTool(
   },
 );
 
+
+server.registerTool(
+  "get_orderbook_depth",
+  {
+    title: "Spot order book depth: walls and 2% depth across Binance, Coinbase, Kraken, Bybit, OKX",
+    description:
+      "Call this when the user asks where the bid or ask walls are, how deep the spot order book is, whether buyers or sellers have more resting orders near price, or for an order book heatmap. Returns the five venues' books binned into 0.1% buckets within 5% of mid (USD notional), the largest walls with venue split, 2% depth and book reach per venue, and optionally the summed 5-minute history; coins: BTC, ETH, SOL, XRP, DOGE, ADA, LINK, AVAX, LTC, BNB.",
+    inputSchema: {
+      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,12}$/).optional().describe("One coin, e.g. BTC (default BTC)"),
+      hours: z.number().int().min(1).max(24).optional().describe("Include the summed 5-minute history for this many hours"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol, hours }: { symbol?: string; hours?: number }) => {
+    try {
+      const params = new URLSearchParams();
+      if (symbol) params.set("symbol", symbol);
+      if (hours) params.set("hours", String(hours));
+      const qs = params.toString();
+      const path = `/api/public/orderbook${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 }

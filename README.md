@@ -77,6 +77,7 @@ Requires Node.js 18 or newer.
 | `get_hl_whales` | "Are Hyperliquid whales net long BTC? What did the biggest accounts just flip?" |
 | `get_positioning` | "BTC long/short ratio on Binance? Are top traders net short ETH? CVD today?" |
 | `get_coverage` | "Which exchanges are behind your liquidation totals? How fresh is the data?" |
+| `get_orderbook_depth` | "Where is the biggest BTC bid wall? How deep is ETH within 2% on Coinbase vs Binance?" |
 | `get_cycle_indicators` | "Has the Pi Cycle crossed? Mayer Multiple and Puell today?" |
 | `get_altseason` | "Is it altseason?", "What is the altcoin season index?" |
 | `get_metric_context` | "Is today's funding extreme historically?", "Where does this reading sit in its distribution?" |
