@@ -1078,4 +1078,46 @@ server.registerTool(
   },
 );
 
+
+server.registerTool(
+  "get_positioning",
+  {
+    title: "Positioning: long/short ratios, taker buy/sell and CVD on Binance, Bybit, OKX",
+    description:
+      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes.",
+    inputSchema: {
+      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,24}$/).optional().describe("One Binance symbol, e.g. BTCUSDT"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol }: { symbol?: string }) => {
+    try {
+      const path = `/api/public/positioning${symbol ? `?symbol=${encodeURIComponent(symbol)}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+
+server.registerTool(
+  "get_coverage",
+  {
+    title: "Coverage registry: which venues and data types we collect, how, and how fresh",
+    description:
+      "Call this when the user asks which exchanges sit behind a ByKaranteli number, whether a feed is complete or sampled, since when a venue is collected, or how fresh the data is. Returns the live coverage registry: liquidation feeds per venue with kind and last record, snapshot feeds per venue and market, funding arbitrage legs, positioning sources, whale tape, spot minutes and the Hyperliquid whale scan with freshness.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      const path = "/api/public/coverage";
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 }
