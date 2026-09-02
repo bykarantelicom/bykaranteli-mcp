@@ -960,4 +960,43 @@ server.registerTool(
     }
   },
 );
+
+server.registerTool(
+  "get_tradfi_board",
+  {
+    title: "TradFi perpetuals: stock, index and commodity perps on Binance",
+    description:
+      "Call this when the user asks about stock perpetuals (TSLA, NVDA, AAPL, gold, S&P 500...), tokenized-equity perps, TradFi perp funding rates, open interest, liquidations, which exchanges list a stock perp, or whether the equity session is open. Returns Binance's TradFi perpetual board: per contract mark, index, basis, funding, 24h change and volume, open interest, 24h recorded liquidations, other venues listing the same underlying, and the trading-session state per market. Filter by market (EQUITY, HK_EQUITY, KR_EQUITY, CN_EQUITY, COMMODITY, INDEX, PREMARKET) or one symbol.",
+    inputSchema: {
+      market: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z_]{3,16}$/)
+        .optional()
+        .describe("Market filter: EQUITY | HK_EQUITY | KR_EQUITY | CN_EQUITY | COMMODITY | INDEX | PREMARKET"),
+      symbol: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z0-9]{2,24}$/)
+        .optional()
+        .describe("One Binance TradFi symbol, e.g. TSLAUSDT"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ market, symbol }: { market?: string; symbol?: string }) => {
+    try {
+      const params = new URLSearchParams();
+      if (market) params.set("market", market);
+      if (symbol) params.set("symbol", symbol);
+      const qs = params.toString();
+      const path = `/api/public/tradfi${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 }

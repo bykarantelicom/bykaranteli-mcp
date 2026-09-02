@@ -72,6 +72,7 @@ Requires Node.js 18 or newer.
 | `get_new_listings` | "Which perpetuals were listed this week, and where first?" |
 | `get_macro_liquidity` | "What is the Fed balance sheet / RRP / stablecoin supply doing?" |
 | `get_network_health` | "Bitcoin hashrate, difficulty, fees, mempool right now?" |
+| `get_tradfi_board` | "TSLA perp funding rate? Which exchanges list NVDA perps? Is the stock session open?" |
 | `get_altseason` | "Is it altseason?", "What is the altcoin season index?" |
 | `get_metric_context` | "Is today's funding extreme historically?", "Where does this reading sit in its distribution?" |
 | `get_quantum_exposure` | "How much Bitcoin is quantum-vulnerable?", "What is the P2PK exposure?" |
