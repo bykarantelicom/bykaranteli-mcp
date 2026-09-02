@@ -244,14 +244,14 @@ server.registerTool(
   {
     title: "US spot Bitcoin and Ethereum ETF daily flows",
     description:
-      "Call this when the user asks about Bitcoin or Ethereum ETF flows: daily net inflows or outflows, cumulative flow since launch, or total net assets of the US spot ETFs (IBIT, FBTC, ETHA and the rest). Returns one row per finalized US trading day and asset with net inflow, total net assets, cumulative inflow and value traded, all in USD. About 14 months of history.",
+      "Call this when the user asks about Bitcoin, Ethereum or Solana spot ETF flows: daily net inflows or outflows, cumulative flow since launch, or total net assets of the US spot ETFs (IBIT, FBTC, ETHA and the rest). Returns one row per finalized US trading day and asset with net inflow, total net assets, cumulative inflow and value traded, all in USD. About 14 months of history.",
     inputSchema: {
-      asset: z.enum(["BTC", "ETH"]).optional().describe("Filter to one asset. Omit for both."),
+      asset: z.enum(["BTC", "ETH", "SOL"]).optional().describe("Filter to one asset (BTC, ETH or SOL, SOL since 2026-09-02). Omit for all."),
       days: z.number().int().min(1).max(400).optional().describe("How many most recent trading days to return (default 10)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ asset, days }: { asset?: "BTC" | "ETH"; days?: number }) => {
+  async ({ asset, days }: { asset?: "BTC" | "ETH" | "SOL"; days?: number }) => {
     try {
       const d = (await fetchJson("/api/v1/public/datasets/etf-flows.json")) as {
         rows?: Array<Record<string, unknown>>;
