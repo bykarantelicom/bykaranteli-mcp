@@ -1028,4 +1028,27 @@ server.registerTool(
   },
 );
 
+
+server.registerTool(
+  "get_cycle_indicators",
+  {
+    title: "Bitcoin cycle indicators: Pi Cycle, Mayer, 200W MA, Puell, S2F",
+    description:
+      "Call this when the user asks whether Bitcoin is near a cycle top or bottom by the classic indicators, about the Pi Cycle Top, Mayer Multiple, 200-week moving average, 2-year MA multiplier, golden ratio multiple, profitable days, stock-to-flow, Puell Multiple or Bitfinex margin positioning. Returns the latest readings, the Pi Cycle cross dates on record, and optionally the daily series (recomputed nightly from a first-party close record since 2012). Levels, not forecasts.",
+    inputSchema: {
+      days: z.number().int().min(30).max(10000).optional().describe("Window in days for the series (default 730)"),
+      include_points: z.boolean().optional().describe("Include the daily series (large). Default false: latest values and cross dates only."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ days, include_points }: { days?: number; include_points?: boolean }) => {
+    try {
+      const path = `/api/public/indicators?days=${days && days > 0 ? Math.floor(days) : 730}${include_points ? "" : "&points=0"}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 }
