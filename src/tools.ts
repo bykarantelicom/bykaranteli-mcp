@@ -788,12 +788,17 @@ server.registerTool(
     title: "Exchange coverage: OI, volume, funding and pegs across 43 exchanges",
     description:
       "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across 56 feeds on 43 exchanges; pass symbol for one coin's per-venue rows.",
-    inputSchema: { symbol: z.string().optional().describe("string, optional base asset, e.g. BTC") },
+    inputSchema: {
+      symbol: z.string().optional().describe("string, optional base asset, e.g. BTC"),
+      history_days: z.number().int().min(1).max(90).optional().describe("Return the hourly multi-venue open interest history (total, DEX share, OI-weighted funding) for this many days instead of the snapshot"),
+    },
     annotations: READ_ONLY,
   },
   async (args) => {
     try {
-      const path = args.symbol ? `/api/public/venues/markets?symbol=${encodeURIComponent(args.symbol.toUpperCase())}` : "/api/public/venues/markets";
+      const path = args.history_days
+        ? `/api/public/venues/oi-history?days=${Math.min(90, Math.floor(args.history_days))}`
+        : args.symbol ? `/api/public/venues/markets?symbol=${encodeURIComponent(args.symbol.toUpperCase())}` : "/api/public/venues/markets";
       return ok(withProvenance(await fetchJson(path), path));
     } catch (err) {
       return fail(err);
