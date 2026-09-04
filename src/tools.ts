@@ -783,6 +783,24 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_settlements",
+  {
+    title: "Expiry calendar and settlement prices across venues",
+    description:
+      "Call this when the user asks what futures or options expire soon, when the next quarterly expiry is on an exchange, how many contracts settle this week, or at what price a dated future settled. Returns the next 60 days of dated future and option expiries grouped by date, venue and underlying from 54 venues' market lists, plus the settlement prices recorded as dated futures deliver.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try {
+      return ok(withProvenance(await fetchJson("/api/public/settlements"), "/api/public/settlements"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_venue_profile",
   {
     title: "Venue profile: everything ByKaranteli records about one exchange",

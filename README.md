@@ -2,12 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, Fear & Greed, BTC dominance and a verified signal track record.
 
-45 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
+46 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 45 tools, nothing to install, no key.
+assistant. Same 46 tools, nothing to install, no key.
 
 ## Quick start
 
@@ -68,6 +68,7 @@ Requires Node.js 18 or newer.
 | `get_leverage_tiers` | "How much leverage does Bybit allow on SOL?", "Which exchange has the highest max leverage for DOGE?", "Did any venue cut leverage on a coin this week?" |
 | `get_withdrawal_status` | "Has KuCoin paused USDT withdrawals?", "Cheapest network to withdraw USDT from Gate?", "Which exchanges have withdrawals closed right now?" |
 | `get_venue_profile` | "What do you record about Bybit?", "How many contracts does OKX list?", "Is HTX up, and what happened there this week?" |
+| `get_settlements` | "What expires this week?", "When is the next BTC quarterly on OKX?", "At what price did the September future settle?" |
 | `get_lead_lag` | "Does Coinbase or Binance move first?" |
 | `get_iv_surface` | "What is BTC implied vol by expiry?", "Is downside protection expensive (skew)?" |
 | `get_whale_tape` | "Are whales buying or selling right now?" |
@@ -116,7 +117,7 @@ MIT. Attribution appreciated: "ByKaranteli (bykaranteli.com)".
 
 ## Paid depth (optional)
 
-The 45 tools above are free and stay free. For recorded history and raw records
+The 46 tools above are free and stay free. For recorded history and raw records
 beyond the live snapshots, bykaranteli.com also exposes pay-per-call x402
 endpoints (USDC on Solana or Base, priced per call, no account):
 <https://bykaranteli.com/developers#x402> · machine catalog:
