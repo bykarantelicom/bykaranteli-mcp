@@ -783,6 +783,31 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_leverage_tiers",
+  {
+    title: "Leverage tiers: max leverage and maintenance margin per perpetual on every venue",
+    description:
+      "Call this when the user asks how much leverage an exchange allows on a coin, what the maintenance margin or risk limit ladder is, which venue offers the highest leverage for a symbol, or whether an exchange recently cut leverage. Returns the current ladder per venue (tier, notional floor and cap, max leverage, maintenance margin rate) recorded daily by ByKaranteli, plus a change log. Pass symbol for one base asset (e.g. SOL) and venue for one exchange (bybit, okx, gate, htx, bitget, mexc).",
+    inputSchema: {
+      symbol: z.string().optional().describe("string, optional base asset, e.g. BTC"),
+      venue: z.string().optional().describe("string, optional venue id, e.g. bybit"),
+    },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const qs = new URLSearchParams();
+      if (args.symbol) qs.set("symbol", String(args.symbol).toUpperCase());
+      if (args.venue) qs.set("venue", String(args.venue).toLowerCase());
+      const q = qs.toString();
+      return ok(await getJson(`/api/public/leverage-tiers${q ? `?${q}` : ""}`));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_venue_markets",
   {
     title: "Exchange coverage: OI, volume, funding and pegs across 43 exchanges",
