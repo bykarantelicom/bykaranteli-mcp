@@ -783,6 +783,34 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_borrow_rates",
+  {
+    title: "Margin borrow rates per venue: the cost of leverage, hourly",
+    description:
+      "Call this when the user asks what it costs to borrow USDT, USDC, BTC, ETH or a major alt on an exchange, which venue has the cheapest borrow, whether stablecoin borrow cost is spiking, or what the carry of a basis trade is on a venue (funding minus borrow). Returns the latest annualised rate per venue and asset, 30 days of hourly series for the stablecoins and majors, and the carry table. Recorded hourly by ByKaranteli (Binance and OKX today).",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try { return ok(withProvenance(await fetchJson("/api/public/borrow-rates"), "/api/public/borrow-rates")); } catch (err) { return fail(err); }
+  },
+);
+
+server.registerTool(
+  "get_fee_table",
+  {
+    title: "Trading fee schedules per venue, base tier maker and taker",
+    description:
+      "Call this when the user asks what an exchange charges to trade, how maker and taker fees compare across venues, whether a venue changed its fees, or what a round trip costs on a given notional. Returns base tier maker and taker per venue and market type (median across pairs where the venue prices per pair) and the fee change log, read daily by ByKaranteli from each venue's own fee endpoint.",
+    inputSchema: {},
+    annotations: READ_ONLY,
+  },
+  async () => {
+    try { return ok(withProvenance(await fetchJson("/api/public/fees"), "/api/public/fees")); } catch (err) { return fail(err); }
+  },
+);
+
+server.registerTool(
   "get_settlements",
   {
     title: "Expiry calendar and settlement prices across venues",

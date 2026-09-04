@@ -2,12 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, Fear & Greed, BTC dominance and a verified signal track record.
 
-46 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
+48 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 46 tools, nothing to install, no key.
+assistant. Same 48 tools, nothing to install, no key.
 
 ## Quick start
 
@@ -69,6 +69,8 @@ Requires Node.js 18 or newer.
 | `get_withdrawal_status` | "Has KuCoin paused USDT withdrawals?", "Cheapest network to withdraw USDT from Gate?", "Which exchanges have withdrawals closed right now?" |
 | `get_venue_profile` | "What do you record about Bybit?", "How many contracts does OKX list?", "Is HTX up, and what happened there this week?" |
 | `get_settlements` | "What expires this week?", "When is the next BTC quarterly on OKX?", "At what price did the September future settle?" |
+| `get_borrow_rates` | "What does it cost to borrow USDT on Binance?", "Cheapest venue to borrow ETH?", "Is stablecoin borrow spiking?" |
+| `get_fee_table` | "What are Bitget's perp fees?", "Which exchange has the lowest taker fee?", "Did any venue change fees this week?" |
 | `get_lead_lag` | "Does Coinbase or Binance move first?" |
 | `get_iv_surface` | "What is BTC implied vol by expiry?", "Is downside protection expensive (skew)?" |
 | `get_whale_tape` | "Are whales buying or selling right now?" |
@@ -117,7 +119,7 @@ MIT. Attribution appreciated: "ByKaranteli (bykaranteli.com)".
 
 ## Paid depth (optional)
 
-The 46 tools above are free and stay free. For recorded history and raw records
+The 48 tools above are free and stay free. For recorded history and raw records
 beyond the live snapshots, bykaranteli.com also exposes pay-per-call x402
 endpoints (USDC on Solana or Base, priced per call, no account):
 <https://bykaranteli.com/developers#x402> · machine catalog:
