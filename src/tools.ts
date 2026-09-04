@@ -793,7 +793,7 @@ server.registerTool(
   },
   async (args) => {
     try {
-      return ok(await getJson(args.venue ? `/api/public/venues/profile?venue=${encodeURIComponent(String(args.venue).toLowerCase())}` : "/api/public/venues/profile"));
+      return ok(withProvenance(await fetchJson(args.venue ? `/api/public/venues/profile?venue=${encodeURIComponent(String(args.venue).toLowerCase())}` : "/api/public/venues/profile"), args.venue ? `/api/public/venues/profile?venue=${encodeURIComponent(String(args.venue).toLowerCase())}` : "/api/public/venues/profile"));
     } catch (err) {
       return fail(err);
     }
@@ -818,7 +818,7 @@ server.registerTool(
       if (args.asset) qs.set("asset", String(args.asset).toUpperCase());
       if (args.venue) qs.set("venue", String(args.venue).toLowerCase());
       const q = qs.toString();
-      return ok(await getJson(`/api/public/withdrawals${q ? `?${q}` : ""}`));
+      return ok(withProvenance(await fetchJson(`/api/public/withdrawals${q ? `?${q}` : ""}`), `/api/public/withdrawals${q ? `?${q}` : ""}`));
     } catch (err) {
       return fail(err);
     }
@@ -843,7 +843,7 @@ server.registerTool(
       if (args.symbol) qs.set("symbol", String(args.symbol).toUpperCase());
       if (args.venue) qs.set("venue", String(args.venue).toLowerCase());
       const q = qs.toString();
-      return ok(await getJson(`/api/public/leverage-tiers${q ? `?${q}` : ""}`));
+      return ok(withProvenance(await fetchJson(`/api/public/leverage-tiers${q ? `?${q}` : ""}`), `/api/public/leverage-tiers${q ? `?${q}` : ""}`));
     } catch (err) {
       return fail(err);
     }
