@@ -783,6 +783,24 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_venue_profile",
+  {
+    title: "Venue profile: everything ByKaranteli records about one exchange",
+    description:
+      "Call this when the user asks about a specific exchange (Bybit, OKX, Gate, KuCoin, HTX, Bitget, MEXC, BitMEX, Hyperliquid ...): how many contracts it lists, its perp open interest and average funding, its leverage ladders, deposit and withdrawal networks and how many are paused, its base fee schedule, its status uptime and the recent event log (listings, delistings, leverage cuts, withdrawal pauses, incidents). Without venue returns the list of recorded venues.",
+    inputSchema: { venue: z.string().optional().describe("string, optional venue id, e.g. bybit") },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      return ok(await getJson(args.venue ? `/api/public/venues/profile?venue=${encodeURIComponent(String(args.venue).toLowerCase())}` : "/api/public/venues/profile"));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_withdrawal_status",
   {
     title: "Withdrawal status and network fees: which exchanges paused withdrawals, per asset and network",
