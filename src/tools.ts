@@ -62,13 +62,33 @@ type ToolResult = {
 
 /* Every answer carries where it came from and when (README promise; audit
  * P3 #416): routes that already emit these keep their own values. */
+/* API stems whose public page has a different name. Stripping /api/public off
+ * the route gave nine tools a `source` that 404s on the site (2026-09-04
+ * audit: /borrow-rates, /oi, /recent, /venues/markets ...). */
+const PAGE_FOR_STEM: Record<string, string> = {
+  "/borrow-rates": "/borrow",
+  "/oi": "/oi-leaderboard",
+  "/recent": "/signals",
+  "/leaderboard": "/strategies",
+  "/venues/markets": "/venues",
+  "/venues/lead-lag": "/venues",
+  "/venues/profile": "/venues",
+  "/datasets/etf-flows": "/etf",
+  "/datasets/liquidations-daily": "/liquidations",
+};
+
+function pageForApiPath(path: string): string {
+  const stem = path.replace(/^\/api\/(?:v1\/)?public/, "").split("?")[0] || "/";
+  return PAGE_FOR_STEM[stem] ?? stem;
+}
+
 function withProvenance(data: unknown, path: string): unknown {
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
   const record = data as Record<string, unknown>;
   return {
     ...record,
     generatedAt: typeof record.generatedAt === "string" ? record.generatedAt : new Date().toISOString(),
-    source: typeof record.source === "string" ? record.source : `${PUBLIC_URL}${path.replace(/^\/api\/public/, "").split("?")[0] || "/"}`,
+    source: typeof record.source === "string" ? record.source : `${PUBLIC_URL}${pageForApiPath(path)}`,
   };
 }
 
