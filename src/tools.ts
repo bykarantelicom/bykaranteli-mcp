@@ -783,6 +783,31 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_withdrawal_status",
+  {
+    title: "Withdrawal status and network fees: which exchanges paused withdrawals, per asset and network",
+    description:
+      "Call this when the user asks whether an exchange has paused withdrawals or deposits, which networks are open for an asset, what the withdrawal fee or minimum is on each venue, or which venue is cheapest to withdraw from. Without arguments returns the overview (withdrawals paused right now, ranked, plus recent suspension and resumption events). Pass asset (e.g. USDT) for every venue and network of that asset, and venue (e.g. kucoin) to narrow. Recorded daily by ByKaranteli from 20+ venues' public currency lists.",
+    inputSchema: {
+      asset: z.string().optional().describe("string, optional asset code, e.g. USDT"),
+      venue: z.string().optional().describe("string, optional venue id, e.g. kucoin"),
+    },
+    annotations: READ_ONLY,
+  },
+  async (args) => {
+    try {
+      const qs = new URLSearchParams();
+      if (args.asset) qs.set("asset", String(args.asset).toUpperCase());
+      if (args.venue) qs.set("venue", String(args.venue).toLowerCase());
+      const q = qs.toString();
+      return ok(await getJson(`/api/public/withdrawals${q ? `?${q}` : ""}`));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_leverage_tiers",
   {
     title: "Leverage tiers: max leverage and maintenance margin per perpetual on every venue",
