@@ -92,8 +92,27 @@ function withProvenance(data: unknown, path: string): unknown {
   };
 }
 
+/* Compact JSON (pretty-printing cost ~35% of the budget) and a hard ceiling:
+ * a few argument combinations produced 400k+ characters, more than an LLM
+ * context window, with no signal that anything was cut (audit 2026-09-04
+ * #41). Above the ceiling the tool answers with guidance instead of a
+ * payload the caller could not use anyway. */
+const MAX_RESULT_CHARS = 240_000;
+
 function ok(data: unknown): ToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  const text = JSON.stringify(data);
+  if (text.length <= MAX_RESULT_CHARS) return { content: [{ type: "text", text }] };
+  return {
+    content: [{
+      type: "text",
+      text: JSON.stringify({
+        truncated: true,
+        chars: text.length,
+        limit: MAX_RESULT_CHARS,
+        note: "Result too large for one context window. Narrow the call: fewer hours or days, a single symbol, or include_points=false, then call again.",
+      }),
+    }],
+  };
 }
 
 function fail(err: unknown): ToolResult {
@@ -1056,7 +1075,7 @@ server.registerTool(
   {
     title: "Bitcoin network health from our own node",
     description:
-      "Call this when the user asks about Bitcoin hashrate, difficulty, fees or mempool congestion. Returns the recorded daily series and latest values measured on ByKaranteli's own node.",
+      "Call this when the user asks about Bitcoin hashrate, difficulty or block fees (our node runs blocksonly, so there is no mempool series). Returns the recorded daily series and latest values measured on ByKaranteli's own node.",
     inputSchema: { days: z.number().int().min(1).max(730).optional().describe("Window in days, 1-730 (default 365).") },
     annotations: READ_ONLY,
   },
