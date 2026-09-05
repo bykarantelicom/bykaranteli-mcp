@@ -66,7 +66,6 @@ check(
  * before the targeted assertions so their deeper checks still apply. */
 const REQUIRED_ARGS = {
   get_metric_context: { metric: "fear_greed" },
-  get_symbol_performance: { symbol: "BTCUSDT" },
 };
 for (const toolName of names) {
   const r = await callAll(toolName, REQUIRED_ARGS[toolName] ?? {});
@@ -112,22 +111,6 @@ check(
   heat.text.slice(0, 80).replace(/\n/g, " "),
 );
 
-const perf = await call("get_symbol_performance", { symbol: "ETH", window_days: 180 });
-check(
-  "get_symbol_performance(ETH,180)",
-  !perf.isError && perf.text.includes("ETHUSDT") && perf.text.includes("winRatePct"),
-  perf.text.slice(0, 80).replace(/\n/g, " "),
-);
-
-// Windows with no closed signals 404 upstream; the tool must answer with a
-// plain note instead of an error.
-const perfEmpty = await call("get_symbol_performance", { symbol: "ETH", window_days: 30 });
-check(
-  "get_symbol_performance empty window note",
-  !perfEmpty.isError && perfEmpty.text.includes("No closed signals"),
-  perfEmpty.text.slice(0, 80).replace(/\n/g, " "),
-);
-
 const pressure = await call("get_pressure_scores", { limit: 3 });
 check(
   "get_pressure_scores(limit=3)",
@@ -149,12 +132,6 @@ check("get_funding_arbitrage", !arb.isError && arb.text.includes("netApr"), "");
 
 const movers = await call("get_top_movers");
 check("get_top_movers", !movers.isError && movers.text.includes("biggestOi24h"), "");
-
-const recent = await call("get_recent_signals");
-check("get_recent_signals", !recent.isError && recent.text.includes("total24h"), "");
-
-const lb = await call("get_strategy_leaderboard");
-check("get_strategy_leaderboard", !lb.isError && lb.text.includes("profit_factor_net"), "");
 
 child.kill();
 console.log(failures.length === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures.length} FAILURES: ${failures.join(", ")}`);

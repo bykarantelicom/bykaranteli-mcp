@@ -68,8 +68,6 @@ type ToolResult = {
 const PAGE_FOR_STEM: Record<string, string> = {
   "/borrow-rates": "/borrow",
   "/oi": "/oi-leaderboard",
-  "/recent": "/signals",
-  "/leaderboard": "/strategies",
   "/venues/markets": "/venues",
   "/venues/lead-lag": "/venues",
   "/venues/profile": "/venues",
@@ -451,95 +449,6 @@ server.registerTool(
     try {
       const d = (await fetchJson("/api/public/top-movers")) as Record<string, unknown>;
       return ok({ ...d, source: `${PUBLIC_URL}/top-movers` });
-    } catch (err) {
-      return fail(err);
-    }
-  },
-);
-
-server.registerTool(
-  "get_recent_signals",
-  {
-    title: "Recent closed trading signals with verified outcomes",
-    description:
-      "Call this when the user asks how the ByKaranteli signal engine is doing today, or wants recent closed LONG/SHORT signals with real outcomes (TP1, SL or TIMEOUT) and net basis-point results. Includes a 24h summary (wins, losses, net bps). Every signal is published with a SHA-256 receipt and results are net of fees, slippage and funding; live signals only, never backtests.",
-    inputSchema: {},
-    annotations: READ_ONLY,
-  },
-  async () => {
-    try {
-      const d = (await fetchJson("/api/public/recent")) as Record<string, unknown>;
-      return ok({ ...d, source: `${PUBLIC_URL}/signals` });
-    } catch (err) {
-      return fail(err);
-    }
-  },
-);
-
-server.registerTool(
-  "get_symbol_performance",
-  {
-    title: "Per-symbol signal performance and recent trades",
-    description:
-      "Call this when the user asks how signals performed on a specific coin (win rate, profit factor, net PnL, best/worst trade) or wants that coin's recent closed signals. Data is the live verified track record for one Binance USDT-M perp over a 30, 90 or 180 day window.",
-    inputSchema: {
-      symbol: z.string().describe("The symbol, e.g. BTCUSDT, or a coin name like BTC."),
-      window_days: z
-        .preprocess(
-          (v) => (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : v),
-          z.number().int().min(1).max(365),
-        )
-        .optional()
-        .describe("Optional lookback window in days, 1 to 365 (the API accepts any integer in that range). Default 90."),
-    },
-    annotations: READ_ONLY,
-  },
-  async ({ symbol, window_days }) => {
-    try {
-      const want = normalizeSymbol(symbol);
-      const w = window_days ?? 90;
-      let d: Record<string, unknown>;
-      try {
-        d = (await fetchJson(`/api/v1/public/symbols/${want}?window=${w}`)) as Record<string, unknown>;
-      } catch (err) {
-        // The API 404s when the symbol has no closed signals in the chosen
-        // window (data-dependent, not an invalid request). Say so plainly.
-        if (err instanceof Error && err.message.includes("HTTP 404")) {
-          return ok({
-            symbol: want,
-            window_days: w,
-            note: `No closed signals recorded for ${want} in the last ${w} days (or the symbol is not tracked). Try window_days: 180, or check ${PUBLIC_URL}/symbols/${want}.`,
-          });
-        }
-        throw err;
-      }
-      // daily_points can be long; the stats + recent signals carry the answer.
-      const daily = d.daily_points as unknown[] | undefined;
-      return ok({
-        ...d,
-        daily_points: Array.isArray(daily) ? daily.slice(-30) : daily,
-        daily_points_truncated: Array.isArray(daily) ? daily.length > 30 : false,
-        source: `${PUBLIC_URL}/symbols/${want}`,
-      });
-    } catch (err) {
-      return fail(err);
-    }
-  },
-);
-
-server.registerTool(
-  "get_strategy_leaderboard",
-  {
-    title: "Strategy leaderboard with verified live results",
-    description:
-      "Call this when the user asks which trading strategies are performing best, or wants win rate, profit factor, drawdown and Sharpe per strategy. Rankings are computed from live closed signals only (no backtests), net of fees.",
-    inputSchema: {},
-    annotations: READ_ONLY,
-  },
-  async () => {
-    try {
-      const d = (await fetchJson("/api/v1/public/leaderboard")) as Record<string, unknown>;
-      return ok({ ...d, source: `${PUBLIC_URL}/leaderboard` });
     } catch (err) {
       return fail(err);
     }
@@ -1157,7 +1066,6 @@ server.registerTool(
   },
 );
 
-
 server.registerTool(
   "get_rsi_heatmap",
   {
@@ -1186,7 +1094,6 @@ server.registerTool(
   },
 );
 
-
 server.registerTool(
   "get_cycle_indicators",
   {
@@ -1208,7 +1115,6 @@ server.registerTool(
     }
   },
 );
-
 
 server.registerTool(
   "get_hl_whales",
@@ -1236,7 +1142,6 @@ server.registerTool(
   },
 );
 
-
 server.registerTool(
   "get_positioning",
   {
@@ -1257,7 +1162,6 @@ server.registerTool(
     }
   },
 );
-
 
 server.registerTool(
   "get_jupiter_perps",
@@ -1303,7 +1207,6 @@ server.registerTool(
     }
   },
 );
-
 
 server.registerTool(
   "get_orderbook_depth",
