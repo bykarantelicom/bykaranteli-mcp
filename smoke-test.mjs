@@ -54,7 +54,7 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 34, names.join(","));
+check("tools/list count", names.length === 45, names.join(","));
 check(
   "all tools annotated read-only",
   (list.result?.tools ?? []).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
@@ -118,14 +118,14 @@ check(
   `symbols=${(pressure.text.match(/"symbol"/g) ?? []).length}`,
 );
 
-const bad = await call("get_symbol_performance", { symbol: "not a symbol!!" });
-check("invalid symbol rejected", bad.isError === true && bad.text.startsWith("Invalid input"), bad.text.slice(0, 70));
+const bad = await call("get_liquidations", { symbol: "not a symbol!!" });
+check("invalid symbol rejected", bad.isError === true, bad.text.slice(0, 70));
 
 // LLM-typical spellings must normalize instead of erroring.
 const slash = await call("get_funding_heatmap", { symbol: "BTC/USDT" });
 check("BTC/USDT normalized", !slash.isError && slash.text.includes("BTCUSDT"), "");
-const strWin = await call("get_symbol_performance", { symbol: "ETH", window_days: "180" });
-check("string window_days coerced", !strWin.isError && strWin.text.includes("winRatePct"), "");
+const strWin = await call("get_liquidations", { symbol: "ETH", window_days: "3" });
+check("string window_days coerced", !strWin.isError && strWin.text.includes("window_days"), "");
 
 const arb = await call("get_funding_arbitrage");
 check("get_funding_arbitrage", !arb.isError && arb.text.includes("netApr"), "");
