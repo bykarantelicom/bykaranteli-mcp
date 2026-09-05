@@ -487,10 +487,10 @@ server.registerTool(
       window_days: z
         .preprocess(
           (v) => (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : v),
-          z.union([z.literal(30), z.literal(90), z.literal(180)]),
+          z.number().int().min(1).max(365),
         )
         .optional()
-        .describe("Optional lookback window in days (30, 90 or 180). Default 90."),
+        .describe("Optional lookback window in days, 1 to 365 (the API accepts any integer in that range). Default 90."),
     },
     annotations: READ_ONLY,
   },
@@ -983,12 +983,12 @@ server.registerTool(
     title: "Options implied-volatility surface and 25-delta skew",
     description:
       "Call this when the user asks about implied volatility by strike or expiry, skew, put versus call IV, term structure of IV, or whether downside protection is expensive. Returns the IV surface (expiry x moneyness), per-expiry ATM / 25-delta put and call IV, skew and butterfly, and the constant-30d history, from the daily Deribit chain.",
-    inputSchema: { currency: z.string().optional().describe("BTC or ETH, default BTC") },
+    inputSchema: { currency: z.enum(["BTC", "ETH"]).optional().describe("BTC or ETH, default BTC") },
     annotations: READ_ONLY,
   },
   async (args) => {
     try {
-      const path = `/api/public/options/surface?currency=${(args.currency ?? "BTC").toUpperCase() === "ETH" ? "ETH" : "BTC"}`;
+      const path = `/api/public/options/surface?currency=${args.currency ?? "BTC"}`;
       return ok(withProvenance(await fetchJson(path), path));
     } catch (err) {
       return fail(err);
@@ -1290,7 +1290,7 @@ server.registerTool(
   {
     title: "Coverage registry: which venues and data types we collect, how, and how fresh",
     description:
-      "Call this when the user asks which exchanges sit behind a ByKaranteli number, whether a feed is complete or sampled, since when a venue is collected, or how fresh the data is. Returns the live coverage registry: liquidation feeds per venue with kind and last record, snapshot feeds per venue and market, funding arbitrage legs, positioning sources, whale tape, spot minutes and the Hyperliquid whale scan with freshness.",
+      "Call this when the user asks which exchanges sit behind a ByKaranteli number, whether a feed is complete or sampled, since when a venue is collected, or how fresh the data is. Returns the live coverage registry: liquidation feeds per venue with kind and last record, snapshot feeds per venue and market, funding arbitrage legs, positioning sources, whale tape, spot minutes and the Hyperliquid whale scan with freshness. snapshots[].country is the jurisdiction only when the venue states one; it is null for most venues, so do not read null as unknown risk.",
     inputSchema: {},
     annotations: READ_ONLY,
   },
