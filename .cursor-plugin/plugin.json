@@ -1,6 +1,6 @@
 {
   "name": "bykaranteli-mcp",
-  "description": "34 read-only crypto derivatives data tools: liquidations and liquidation maps, funding rates and arbitrage, open interest, options, VPIN order flow, Coinbase premium, CFTC COT, ETF flows, FOMC impact. Free, no API key.",
+  "description": "45 read-only crypto derivatives data tools: liquidations and liquidation maps, funding rates and arbitrage, open interest, options, VPIN order flow, Coinbase premium, CFTC COT, ETF flows, FOMC impact. Free, no API key.",
   "version": "0.9.3",
   "author": { "name": "ByKaranteli", "email": "support@bykaranteli.com", "url": "https://bykaranteli.com" },
   "license": "MIT",

@@ -947,7 +947,7 @@ server.registerTool(
     title: "New and delisted perpetual contracts",
     description:
       "Call this when the user asks what new perpetuals were listed, which exchange listed a coin first, or about delistings. Returns listings and delistings across six exchanges from the hourly scan.",
-    inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Window in days, 1-30 (default 30). Longer listing history is the paid x402 dataset.") },
+    inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Window in days, 1-30 (default 30). Longer listing history is the listings dataset at bykaranteli.com/data.") },
     annotations: READ_ONLY,
   },
   async (args) => {
