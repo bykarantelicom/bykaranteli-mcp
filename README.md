@@ -2,19 +2,21 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-45 read-only tools over the free, no-auth public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). No API key, no account, no rate-limit registration. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
+45 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-17 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 45 tools, nothing to install, no key.
+assistant. Same 45 tools, nothing to install. Without a key it runs on the
+shared Free pool; a connector header `Authorization: Bearer bk_...` (Builder
+and above) brings your own rate limit and member depth.
 
 ## Quick start
 
 ### Claude Code
 
 ```bash
-claude mcp add bykaranteli -- npx -y bykaranteli-mcp
+claude mcp add bykaranteli -e BYKARANTELI_API_KEY=bk_... -- npx -y bykaranteli-mcp
 ```
 
 ### Claude Desktop
@@ -26,7 +28,8 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "bykaranteli": {
       "command": "npx",
-      "args": ["-y", "bykaranteli-mcp"]
+      "args": ["-y", "bykaranteli-mcp"],
+      "env": { "BYKARANTELI_API_KEY": "bk_..." }
     }
   }
 }
@@ -34,7 +37,7 @@ Add to `claude_desktop_config.json`:
 
 ### Cursor / other MCP clients
 
-Any stdio MCP client works: command `npx`, args `["-y", "bykaranteli-mcp"]`.
+Any stdio MCP client works: command `npx`, args `["-y", "bykaranteli-mcp"]`, env `BYKARANTELI_API_KEY`.
 
 Requires Node.js 18 or newer.
 
@@ -94,6 +97,7 @@ All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL t
 
 | Env var | Default | Purpose |
 |---|---|---|
+| `BYKARANTELI_API_KEY` | none | Account key (`bk_...`) sent as `Authorization: Bearer`. Free at <https://bykaranteli.com/dashboard/api>; required for programs from 2026-09-17 |
 | `BYKARANTELI_BASE_URL` | `https://bykaranteli.com` | Override the API host (testing only) |
 
 ## Data notes
@@ -112,12 +116,20 @@ node dist/index.js   # speaks MCP over stdio
 
 ## License
 
-MIT. Attribution appreciated: "ByKaranteli (bykaranteli.com)".
+Server: MIT. Data: personal and research use with attribution "ByKaranteli (bykaranteli.com)"; commercial use with the Business plan. Licence text: <https://bykaranteli.com/data#license>.
 
-## Paid depth (optional)
+## Plans and paid depth
 
-The 45 tools above are free and stay free. For recorded history and raw records
-beyond the live snapshots, bykaranteli.com also exposes pay-per-call x402
-endpoints (USDC on Solana or Base, priced per call, no account):
-<https://bykaranteli.com/developers#x402> · machine catalog:
-<https://bykaranteli.com/api/x402>
+| Plan | Price | Rate | Depth |
+|---|---|---|---|
+| Free API | $0 | 30 / min | public pages |
+| Builder | $49 / mo | 300 / min | member depth, x402 catalog included |
+| Business | $149 / mo | 1,200 / min | member depth, commercial licence, monthly bulk |
+| Scale | $399 / mo | 3,000 / min | member depth, derived redistribution, daily raw |
+
+Full table: <https://bykaranteli.com/developers#tiers>. For recorded history and
+raw records beyond the live snapshots, bykaranteli.com also exposes pay-per-call
+x402 endpoints for anonymous agents (USDC on Solana or Base, priced per call,
+no account): <https://bykaranteli.com/developers#x402> · machine catalog:
+<https://bykaranteli.com/api/x402>. Builder and higher keys call those routes
+unpaid within their plan limits.

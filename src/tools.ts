@@ -18,6 +18,15 @@ export type RegisterOptions = {
   publicUrl?: string;
   /** Version string for the outbound user-agent. */
   version?: string;
+  /** Account API key (bk_...) sent as Authorization: Bearer on every fetch.
+   * Since 2026-09-17 the public API asks programs for one; a free key comes
+   * with any verified account (https://bykaranteli.com/dashboard/api) and paid
+   * plans raise the rate and unlock member depth. Falls back to the
+   * BYKARANTELI_API_KEY environment variable. */
+  apiKey?: string;
+  /** Per-call Authorization value, for hosts that forward their caller's key
+   * (the hosted endpoint). Takes precedence over apiKey when it returns one. */
+  authorizationProvider?: () => string | undefined;
 };
 
 export function registerByKaranteliTools(server: McpServer, options?: RegisterOptions): void {
@@ -25,6 +34,12 @@ export function registerByKaranteliTools(server: McpServer, options?: RegisterOp
   const PUBLIC_URL = (options?.publicUrl ?? process.env.BYKARANTELI_PUBLIC_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
   const USER_AGENT = `bykaranteli-mcp/${options?.version ?? "dev"} (+https://github.com/bykarantelicom/bykaranteli-mcp)`;
   const TIMEOUT_MS = 15_000;
+  const STATIC_KEY = (options?.apiKey ?? process.env.BYKARANTELI_API_KEY ?? "").trim();
+  const authorizationFor = (): string | undefined => {
+    const forwarded = options?.authorizationProvider?.();
+    if (forwarded) return forwarded;
+    return STATIC_KEY ? `Bearer ${STATIC_KEY}` : undefined;
+  };
 
 // Read-only GET tools over an open-world public API, all of them.
 const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
@@ -39,9 +54,14 @@ async function fetchJson(path: string): Promise<unknown> {
     TIMEOUT_MS,
   );
   try {
+    const authorization = authorizationFor();
     const res = await fetch(`${BASE_URL}${path}`, {
       signal: controller.signal,
-      headers: { accept: "application/json", "user-agent": USER_AGENT },
+      headers: {
+        accept: "application/json",
+        "user-agent": USER_AGENT,
+        ...(authorization ? { authorization } : {}),
+      },
     });
     if (!res.ok) {
       /* Carry the route's own error body (audit P3 #412): "HTTP 400" alone
