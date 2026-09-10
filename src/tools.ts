@@ -1023,7 +1023,7 @@ server.registerTool(
   {
     title: "LiqMap: estimated liquidation clusters with real prints overlaid",
     description:
-      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the public LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from six venues. Public tier serves the 24h view; other intervals are a member feature at the source page.",
+      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from six venues. Without an account key (or on the Free plan) the 24h view; with a Builder or higher key (BYKARANTELI_API_KEY) every timeframe from 1h to 30d.",
     inputSchema: {
       symbol: z
         .string()
@@ -1032,14 +1032,18 @@ server.registerTool(
         .regex(/^[A-Z0-9]{2,20}$/)
         .optional()
         .describe("Symbol like BTCUSDT (bare BTC accepted). Default BTCUSDT."),
+      timeframe: z
+        .enum(["1h", "4h", "12h", "24h", "3d", "1w", "30d"])
+        .optional()
+        .describe("Model window. Default 24h, the only one served without a Builder or higher key."),
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol }: { symbol?: string }) => {
+  async ({ symbol, timeframe }: { symbol?: string; timeframe?: string }) => {
     try {
       const raw = symbol ?? "BTCUSDT";
       const sym = raw.endsWith("USDT") ? raw : `${raw}USDT`;
-      const path = `/api/liqmap/public?symbol=${encodeURIComponent(sym)}&timeframe=24h`;
+      const path = `/api/liqmap/public?symbol=${encodeURIComponent(sym)}&timeframe=${encodeURIComponent(timeframe ?? "24h")}`;
       const data = await fetchJson(path);
       return ok({ ...(data as Record<string, unknown>), source: `${PUBLIC_URL}/liqmap/${sym.replace(/USDT$/, "").toLowerCase()}` });
     } catch (err) {
