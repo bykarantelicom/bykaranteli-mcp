@@ -19,7 +19,7 @@ export type RegisterOptions = {
   /** Version string for the outbound user-agent. */
   version?: string;
   /** Account API key (bk_...) sent as Authorization: Bearer on every fetch.
-   * Since 2026-09-17 the public API asks programs for one; a free key comes
+   * Since 2026-09-10 the public API asks programs for one; a free key comes
    * with any verified account (https://bykaranteli.com/dashboard/api) and paid
    * plans raise the rate and unlock member depth. Falls back to the
    * BYKARANTELI_API_KEY environment variable. */
