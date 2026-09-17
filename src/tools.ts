@@ -1188,6 +1188,32 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_turkey_premium",
+  {
+    title: "Turkey premium: TRY reference prices from Turkish venues and the premium over the global price",
+    description:
+      "Call this when the user asks about Bitcoin, Ether or USDT prices in Turkish lira, the Turkey premium, the USDT/TRY rate or dollar premium in Turkey, or which Turkish exchanges (BtcTurk, Bitlo, CoinTR, OKX TR, Binance TR, Bybit TR, KuCoin TR, Bitexen) trade above or below the global price. Returns the live board: five reference prices (median of eligible order books), per-venue book status, spread and depth, premiums in basis points. Pass pair and history_days for 15-minute history of one pair.",
+    inputSchema: {
+      pair: z.string().trim().toUpperCase().regex(/^(BTC-TRY|ETH-TRY|USDT-TRY|BTC-USDT|ETH-USDT)$/).optional().describe("Pair: BTC-TRY, ETH-TRY, USDT-TRY, BTC-USDT or ETH-USDT"),
+      history_days: z.number().int().min(1).max(30).optional().describe("Include 15-minute index history for the pair, 1..30 days"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ pair, history_days }: { pair?: string; history_days?: number }) => {
+    try {
+      const q = new URLSearchParams();
+      if (pair) q.set("pair", pair);
+      if (history_days) q.set("days", String(history_days));
+      const qs = q.toString();
+      const path = `/api/public/turkey-premium${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_jupiter_perps",
   {
     title: "Jupiter Perps (Solana): exact long/short OI, utilization, borrow rates, weekly top traders",
