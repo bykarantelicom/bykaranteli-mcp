@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.bykaranteli/mcp",
-  "description": "Live crypto derivatives data: funding rates and arbitrage, OI pressure, liquidations, options, ETF flows, Fear & Greed. Free account key (BYKARANTELI_API_KEY); paid plans add rate and member depth.",
+  "description": "Crypto derivatives data: funding, open interest, liquidations, options, ETF flows. Free account key.",
   "repository": {
     "url": "https://github.com/bykarantelicom/bykaranteli-mcp",
     "source": "github"
