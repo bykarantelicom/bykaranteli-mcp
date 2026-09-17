@@ -1190,9 +1190,9 @@ server.registerTool(
 server.registerTool(
   "get_turkey_premium",
   {
-    title: "Turkey premium: TRY reference prices from Turkish venues and the premium over the global price",
+    title: "Turkey Premium Index: what lira buyers pay above the world price, with TRY reference prices from Turkish venues",
     description:
-      "Call this when the user asks about Bitcoin, Ether or USDT prices in Turkish lira, the Turkey premium, the USDT/TRY rate or dollar premium in Turkey, or which Turkish exchanges (BtcTurk, Bitlo, CoinTR, OKX TR, Binance TR, Bybit TR, KuCoin TR, Bitexen) trade above or below the global price. Returns the live board: five reference prices (median of eligible order books), per-venue book status, spread and depth, premiums in basis points. Pass pair and history_days for 15-minute history of one pair.",
+      "Call this when the user asks about Bitcoin, Ether or USDT prices in Turkish lira, the Turkey premium, the USDT/TRY rate or dollar premium in Turkey, or which Turkish exchanges (BtcTurk, Bitlo, CoinTR, OKX TR, Binance TR, Bybit TR, KuCoin TR, Bitexen) trade above or below the global price. Returns the live board: the Turkey Premium Index (what a lira buyer pays for bitcoin against the global dollar price at the official exchange rate, in bps) with its dollar leg and crypto leg, a 0-100 score (50 = world price) and regime, 24h and 7d averages and the same-sign streak; then five reference prices (median of eligible order books), per-venue book status, spread, depth and each venue's implied premium. Pass pair and history_days for 15-minute history of one pair.",
     inputSchema: {
       pair: z.string().trim().toUpperCase().regex(/^(BTC-TRY|ETH-TRY|USDT-TRY|BTC-USDT|ETH-USDT)$/).optional().describe("Pair: BTC-TRY, ETH-TRY, USDT-TRY, BTC-USDT or ETH-USDT"),
       history_days: z.number().int().min(1).max(30).optional().describe("Include 15-minute index history for the pair, 1..30 days"),
