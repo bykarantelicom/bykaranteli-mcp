@@ -85,6 +85,7 @@ Requires Node.js 18 or newer.
 | `get_coverage` | "Which exchanges are behind your liquidation totals? How fresh is the data?" |
 | `get_orderbook_depth` | "Where is the biggest BTC bid wall? How deep is ETH within 2% on Coinbase vs Binance?" |
 | `get_jupiter_perps` | "How much long vs short OI is on Jupiter SOL perps? Who topped Jupiter this week? What is the JLP APR?" |
+| `get_turkey_premium` | "What do lira buyers pay for bitcoin above the world price? What is the Turkey Premium Index and its score right now? Which Turkish exchange is dearest? What is USDT/TRY against the official rate?" |
 | `get_cycle_indicators` | "Has the Pi Cycle crossed? Mayer Multiple and Puell today?" |
 | `get_altseason` | "Is it altseason?", "What is the altcoin season index?" |
 | `get_metric_context` | "Is today's funding extreme historically?", "Where does this reading sit in its distribution?" |

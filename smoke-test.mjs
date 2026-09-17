@@ -54,7 +54,7 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 45, names.join(","));
+check("tools/list count", names.length === 46, names.join(","));
 check(
   "all tools annotated read-only",
   (list.result?.tools ?? []).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
