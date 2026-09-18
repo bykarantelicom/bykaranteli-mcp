@@ -2,12 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-46 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
+47 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 46 tools, nothing to install. Without a key it runs on the
+assistant. Same 47 tools, nothing to install. Without a key it runs on the
 shared Free pool; a connector header `Authorization: Bearer bk_...` (Builder
 and above) brings your own rate limit and member depth.
 
@@ -86,6 +86,7 @@ Requires Node.js 18 or newer.
 | `get_orderbook_depth` | "Where is the biggest BTC bid wall? How deep is ETH within 2% on Coinbase vs Binance?" |
 | `get_jupiter_perps` | "How much long vs short OI is on Jupiter SOL perps? Who topped Jupiter this week? What is the JLP APR?" |
 | `get_turkey_premium` | "What do lira buyers pay for bitcoin above the world price? What is the Turkey Premium Index and its score right now? Which Turkish exchange is dearest? What is USDT/TRY against the official rate?" |
+| `get_data_proof` | "Can I verify a ByKaranteli number was not changed later? Show the on-chain proof for BTC funding right now. Which Solana transaction sealed the newest epoch?" |
 | `get_cycle_indicators` | "Has the Pi Cycle crossed? Mayer Multiple and Puell today?" |
 | `get_altseason` | "Is it altseason?", "What is the altcoin season index?" |
 | `get_metric_context` | "Is today's funding extreme historically?", "Where does this reading sit in its distribution?" |

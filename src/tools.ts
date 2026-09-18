@@ -141,7 +141,7 @@ function fail(err: unknown): ToolResult {
       ? `Invalid input: ${message}`
       : permanent
         ? `Error fetching data from bykaranteli.com: ${message}. This is a permanent error for these inputs (wrong parameter or route), not a transient one; retrying will not help.`
-        : `Error fetching data from bykaranteli.com: ${message}. The API is free and unauthenticated; transient errors usually resolve on retry.`;
+        : `Error fetching data from bykaranteli.com: ${message}. Transient errors usually resolve on retry.`;
   return {
     content: [{ type: "text", text }],
     isError: true,
@@ -1207,6 +1207,37 @@ server.registerTool(
       const qs = q.toString();
       const path = `/api/public/turkey-premium${qs ? `?${qs}` : ""}`;
       return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_data_proof",
+  {
+    title: "BYK Data Layer: on-chain proof that a ByKaranteli number was sealed, signed and anchored on Solana and Base",
+    description:
+      "Call this when the user asks whether ByKaranteli data can be verified or was changed afterwards, about the BYK Data Layer, on-chain proofs of market data, or wants the proof behind one sealed number. Every 5 minutes a catalog of derived feeds (funding composite, aggregate open interest, liquidations, depth within 2%, pressure scores, Kimchi and Turkey premiums) is sealed into one Merkle root, signed and written to Solana mainnet, and attested on Base once a day. With no arguments returns the stream overview: network, epochs and records sealed, final anchors and the newest epochs with explorer links. Pass feed and asset for one record's proof (value, 104-byte leaf, Merkle path, signed manifest, signature, Solana and Base anchors) at the newest epoch or at sequence; sequence alone for one epoch; catalog for the feed list. result ANCHORED means ByKaranteli signed it and an anchor is final; the protocol verdict is reached from the chains alone at https://bykaranteli.com/proof.",
+    inputSchema: {
+      feed: z.string().trim().toUpperCase().regex(/^BYK\.[A-Z0-9_.]{3,60}$/).optional().describe("Feed id from the catalog, e.g. BYK.FUNDING.COMPOSITE.B"),
+      asset: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,10}$/).optional().describe("Asset of the feed: BTC, ETH, SOL, XRP, DOGE, BNB, USDT or ALL"),
+      sequence: z.number().int().min(0).optional().describe("Epoch sequence; omit for the newest"),
+      catalog: z.boolean().optional().describe("true: list every sealed feed with its unit and methodology"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ feed, asset, sequence, catalog }: { feed?: string; asset?: string; sequence?: number; catalog?: boolean }) => {
+    try {
+      const route = ((): string | null => {
+    if (catalog) return "/api/v1/proof/catalog";
+    if (feed && asset) return `/api/v1/proof/proofs/${sequence ?? "latest"}/${encodeURIComponent(feed)}/${encodeURIComponent(asset)}`;
+    if (feed || asset) return null;
+    if (sequence !== undefined) return `/api/v1/proof/epochs/${sequence}`;
+    return "/api/v1/proof";
+      })();
+      if (!route) throw new InputError("pass feed and asset together (for example feed BYK.FUNDING.COMPOSITE.B and asset BTC), or neither.");
+      return ok(withProvenance(await fetchJson(route), route));
     } catch (err) {
       return fail(err);
     }

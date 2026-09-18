@@ -23,7 +23,11 @@ child.stdout.on("data", (d) => {
 });
 
 let nextId = 1;
-function rpc(method, params) {
+/* SMOKE_PACE_MS spaces out tool calls so a free key (30 requests a minute) can run the whole suite; 0 keeps the
+ * old back-to-back behaviour for keys with a higher limit. */
+const PACE_MS = Number(process.env.SMOKE_PACE_MS ?? 0);
+async function rpc(method, params) {
+  if (PACE_MS > 0 && method === "tools/call") await new Promise((r) => setTimeout(r, PACE_MS));
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, resolve);
@@ -54,7 +58,7 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 46, names.join(","));
+check("tools/list count", names.length === 47, names.join(","));
 check(
   "all tools annotated read-only",
   (list.result?.tools ?? []).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
