@@ -867,9 +867,9 @@ server.registerTool(
 server.registerTool(
   "get_venue_markets",
   {
-    title: "Exchange coverage: OI, volume, funding and pegs across 43 exchanges",
+    title: "Exchange coverage: OI, volume, funding and pegs across every exchange we snapshot",
     description:
-      "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across 56 feeds on 43 exchanges; pass symbol for one coin's per-venue rows.",
+      "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across every perpetual and spot feed we poll (the coverage field lists them); pass symbol for one coin's per-venue rows.",
     inputSchema: {
       symbol: z.string().optional().describe("string, optional base asset, e.g. BTC"),
       history_days: z.number().int().min(1).max(90).optional().describe("Return the hourly multi-venue open interest history (total, DEX share, OI-weighted funding) for this many days instead of the snapshot"),
