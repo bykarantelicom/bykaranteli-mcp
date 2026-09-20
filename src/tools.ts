@@ -623,6 +623,34 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_liquidation_leaderboard",
+  {
+    title: "Largest single liquidations and a 30-day session heatmap (counted venue feeds)",
+    description:
+      "Call this when the user asks for the biggest liquidation today or this week, who got liquidated for the most, the largest single liquidation print, or when in the day or week liquidations cluster (Asia, Europe or US hours, weekday by UTC hour). Returns the largest single liquidation prints of the last 24h, 7d or 30d (rank, symbol, venue, side where SELL means a long was liquidated, price, quantity, notional, millisecond time) recorded from the counted venues' public feeds, plus a 30-day weekday by UTC hour heatmap with hour, weekday and session totals. Binance publishes at most one print per second per symbol, so its rows are a floor.",
+    inputSchema: {
+      window: z.enum(["24h", "7d", "30d"]).optional().describe("Ranking window: 24h (default), 7d or 30d."),
+      limit: z.number().int().min(1).max(100).optional().describe("Rows to return (default 25, max 100)."),
+      days: z.number().int().min(7).max(90).optional().describe("Days folded into the session heatmap (default 30)."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ window, limit, days }: { window?: "24h" | "7d" | "30d"; limit?: number; days?: number }) => {
+    try {
+      const params = new URLSearchParams();
+      if (window) params.set("window", window);
+      if (limit) params.set("limit", String(limit));
+      if (days) params.set("days", String(days));
+      const qs = params.toString();
+      const path = `/api/public/liquidation-leaderboard${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_open_interest",
   {
     title: "Intraday open interest and leverage regimes (10 major perps)",
