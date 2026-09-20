@@ -1172,9 +1172,9 @@ server.registerTool(
 server.registerTool(
   "get_positioning",
   {
-    title: "Positioning: long/short ratios, taker buy/sell and CVD on Binance, Bybit, OKX",
+    title: "Positioning: long/short ratios, taker buy/sell and CVD on Binance, Bybit, OKX, Gate, HTX, Bitget",
     description:
-      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes.",
+      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps on Binance, Bybit, OKX, Gate, HTX and Bitget (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume, Gate account and top-trader ratios, HTX elite ratios, Bitget account and position ratios) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes.",
     inputSchema: {
       symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,24}$/).optional().describe("One Binance symbol, e.g. BTCUSDT"),
     },
