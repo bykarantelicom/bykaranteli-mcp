@@ -1096,7 +1096,7 @@ server.registerTool(
 server.registerTool(
   "get_rsi_heatmap",
   {
-    title: "RSI heatmap: Wilder RSI(14) on eight timeframes for ~580 perps",
+    title: "RSI heatmap: Wilder RSI(14) on eight timeframes for the top-400 crypto perps and every TradFi perp",
     description:
       "Call this when the user asks which coins are overbought or oversold, for a crypto RSI heatmap, multi-timeframe RSI, or one contract's RSI on 15m, 1h, 4h, 12h, 1d, 3d, 1w or 1M. Returns the live board for the top-400 Binance crypto perps by volume plus every TradFi perp, with overbought/oversold counts per interval. Filter by symbol or kind (crypto|tradfi), sort by an interval.",
     inputSchema: {
