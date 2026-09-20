@@ -384,7 +384,7 @@ server.registerTool(
   {
     title: "Cross-exchange funding arbitrage opportunities",
     description:
-      "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across Binance, OKX, Bybit, Gate, HTX and BingX for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost).",
+      "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across every venue on the board, from Binance, OKX and Bybit to Hyperliquid, dYdX and the smaller perp venues fed by the venue snapshot, for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost).",
     inputSchema: {},
     annotations: READ_ONLY,
   },
