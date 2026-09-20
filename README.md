@@ -8,8 +8,9 @@ MCP (Model Context Protocol) server for **live crypto derivatives data**: fundin
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
 assistant. Same 47 tools, nothing to install. Without a key it runs on the
-shared Free pool; a connector header `Authorization: Bearer bk_...` (Builder
-and above) brings your own rate limit and member depth.
+shared Free pool; a connector header with your account key, `x-api-key: bk_...`
+(claude.ai custom connectors) or `Authorization: Bearer bk_...` (Builder and
+above), brings your own rate limit and member depth.
 
 ## Quick start
 
