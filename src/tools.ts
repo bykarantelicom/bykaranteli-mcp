@@ -432,6 +432,9 @@ server.registerTool(
         regimeLabel: it.regimeLabel,
         components: it.components,
         explainer: it.explainer,
+        /* BYK Data Layer reference (rc6 section 14): the sealed record of the same computation,
+         * so an assistant can cite the on-chain proof of the score it quotes. */
+        ...(it.byk_proof !== undefined ? { byk_proof: it.byk_proof } : {}),
       });
       if (symbol) {
         const want = normalizeSymbol(symbol);

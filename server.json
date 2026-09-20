@@ -6,12 +6,12 @@
     "url": "https://github.com/bykarantelicom/bykaranteli-mcp",
     "source": "github"
   },
-  "version": "0.28.0",
+  "version": "0.28.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "bykaranteli-mcp",
-      "version": "0.28.0",
+      "version": "0.28.1",
       "transport": {
         "type": "stdio"
       }
