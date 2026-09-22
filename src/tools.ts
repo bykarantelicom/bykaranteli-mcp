@@ -1323,9 +1323,9 @@ server.registerTool(
 server.registerTool(
   "get_orderbook_depth",
   {
-    title: "Spot order book depth: walls and 2% depth across every spot venue with a public book",
+    title: "Spot order book depth: walls and 2% depth from every spot venue on the coverage page",
     description:
-      "Call this when the user asks where the bid or ask walls are, how deep the spot order book is, whether buyers or sellers have more resting orders near price, or for an order book heatmap. Returns the books of every spot venue with a public book that the coverage page lists, binned into 0.1% buckets within 20% of mid (USD notional), the largest walls with venue split, 2% depth and book reach per venue, and optionally the summed 5-minute history; coins: BTC, ETH, SOL, XRP, DOGE, ADA, LINK, AVAX, LTC, BNB.",
+      "Call this when the user asks where the bid or ask walls are, how deep the spot order book is, whether buyers or sellers have more resting orders near price, or for an order book heatmap. Returns the books of every spot venue with a public book that the coverage page lists, binned into 0.1% buckets within 20% of mid (USD notional), the largest walls with venue split, 2% depth and book reach per venue, and optionally the summed 5-minute history; coins: BTC, ETH, SOL, XRP, DOGE, ADA, LINK, AVAX, LTC, BNB. Books whose size is not corroborated are recorded and returned per venue with in_aggregate false (listed in held_out) but not summed into the walls, 2% depth or history.",
     inputSchema: {
       symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,12}$/).optional().describe("One coin, e.g. BTC (default BTC)"),
       hours: z.number().int().min(1).max(24).optional().describe("Include the summed 5-minute history for this many hours"),
