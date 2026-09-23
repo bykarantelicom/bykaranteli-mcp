@@ -654,6 +654,33 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_insurance_funds",
+  {
+    title: "Exchange insurance funds: size, 24h and 7d change, fund against open interest, daily history",
+    description:
+      "Call this when the user asks how big an exchange's insurance fund is, whether a fund is shrinking or was used after a crash, how much exchanges hold to absorb bankrupt liquidations, or how a fund compares with the venue's open interest. Returns the latest hourly reading per covered venue (Binance, Bybit, OKX and Gate): the fund in USD (OKX's own published total, the sum of priced pools elsewhere), per asset, 24h and 7d change, the fund as a percent of the venue's perpetual open interest on the coins ByKaranteli tracks, and daily closes per venue. Set pools to include every pool row (the contracts it covers, asset, balance, USD). A fund is a balance the venue reports, not an audit of its reserves.",
+    inputSchema: {
+      venue: z.enum(["binance", "bybit", "okx", "gate"]).optional().describe("One venue; omit for every covered venue."),
+      history_days: z.number().int().min(1).max(366).optional().describe("Days of daily closes (default 30, max 366)."),
+      pools: z.boolean().optional().describe("Include every pool row (large for Binance and Bybit). Default false."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ venue, history_days, pools }: { venue?: "binance" | "bybit" | "okx" | "gate"; history_days?: number; pools?: boolean }) => {
+    try {
+      const params = new URLSearchParams();
+      if (venue) params.set("venue", venue);
+      params.set("days", String(history_days ?? 30));
+      if (!pools) params.set("pools", "0");
+      const path = `/api/public/insurance-funds?${params.toString()}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_open_interest",
   {
     title: "Intraday open interest and leverage regimes (10 major perps)",

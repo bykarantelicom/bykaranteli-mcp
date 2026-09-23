@@ -2,12 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-48 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
+49 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 48 tools, nothing to install. Without a key it runs on the
+assistant. Same 49 tools, nothing to install. Without a key it runs on the
 shared Free pool; a connector header with your account key, `x-api-key: bk_...`
 (claude.ai custom connectors) or `Authorization: Bearer bk_...` (Builder and
 above), brings your own rate limit and member depth.
@@ -53,6 +53,7 @@ Requires Node.js 18 or newer.
 | `get_top_movers` | "Biggest OI spikes today?", "Most extreme funding right now?" |
 | `get_liquidations` | "How much was liquidated today?", "Did longs or shorts get flushed this week?" |
 | `get_liquidation_leaderboard` | "What was the biggest liquidation today?", "When do liquidations cluster, Asia or US hours?" |
+| `get_insurance_funds` | "How big is the Binance insurance fund?", "Did any exchange insurance fund shrink this week?" |
 | `get_etf_flows` | "Did the Bitcoin ETFs buy or sell yesterday?", "Cumulative ETH ETF inflow?" |
 | `get_cot_positioning` | "Are hedge funds long or short Bitcoin?", "What did the COT report show?" |
 | `get_options_snapshot` | "Where are the BTC option walls?", "What is DVOL / the zero-gamma level?" |
