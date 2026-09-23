@@ -501,13 +501,16 @@ server.registerTool(
   {
     title: "Options walls, gamma exposure and DVOL (BTC + ETH)",
     description:
-      "Call this when the user asks where the big options bets sit, about call/put walls, gamma exposure (GEX), the zero-gamma level, implied volatility (DVOL) or the IV term structure for Bitcoin or Ethereum. Daily snapshot of listed crypto options: top strikes by open interest, put/call ratio, dealer hedging map and ATM IV by expiry.",
-    inputSchema: {},
+      "Call this when the user asks where the big options bets sit, about call/put walls, gamma exposure (GEX), the zero-gamma level, implied volatility (DVOL) or the IV term structure for Bitcoin or Ethereum, across options venues or on one venue. Daily snapshot of the listed option chains of every options venue we record, summed by default or one venue with venue: top strikes by open interest, put/call ratio, dealer hedging map, ATM IV by expiry and each venue's open interest (venues_included). DVOL is Deribit's index whatever the venue.",
+    inputSchema: {
+      venue: z.enum(["all", "deribit", "bybit", "binance", "okx", "delta"]).optional().describe("all (default) sums every options venue; or one venue id: deribit, bybit, binance, okx or delta (Delta Exchange India)."),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ venue }: { venue?: "all" | "deribit" | "bybit" | "binance" | "okx" | "delta" }) => {
     try {
-      return ok(withProvenance(await fetchJson("/api/public/options"), "/api/public/options"));
+      const path = venue && venue !== "all" ? `/api/public/options?venue=${venue}` : "/api/public/options";
+      return ok(withProvenance(await fetchJson(path), path));
     } catch (err) {
       return fail(err);
     }
