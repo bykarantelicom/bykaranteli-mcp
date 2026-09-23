@@ -681,6 +681,35 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_tokenized_stocks",
+  {
+    title: "Tokenized stocks onchain: supply, premium to the real share, DEX pools and exchange pairs",
+    description:
+      "Call this when the user asks about tokenized stocks or stock tokens (xStocks, Ondo, Robinhood stock tokens, Coinbase tokenized stocks on Base, Binance bStocks, Backpack): how much of a stock exists onchain, which issuer or chain holds the most, whether a wrapper trades above or below the real share, which DEX pools or exchanges trade it. Returns the board ByKaranteli refreshes every 10 minutes: per underlying the reference share price and its session, each wrapper (issuer, chain, price, premium_pct against a fresh reference, DEX liquidity and 24h volume from admitted pools, supply in shares and dollars, holders, status), tokenized spot pairs on the exchanges the board lists, the perpetual futures cross, and totals (supply by issuer and chain, DEX volume, median premium). Wrappers come from issuer sources only, never from a name search.",
+    inputSchema: {
+      underlying: z.string().regex(/^[A-Za-z0-9.]{1,16}$/).optional().describe("Stock ticker, e.g. TSLA; omit for the whole board."),
+      issuer: z.enum(["xstocks", "robinhood", "coinbase", "bstocks", "ondo", "backpack", "gstocks"]).optional().describe("One issuer; omit for every issuer."),
+      chain: z.string().regex(/^[a-z]{2,12}$/).optional().describe("One chain, e.g. solana, base, bnb, robinhood, ethereum, ton, all (xStocks circulating) or cex (exchange pairs)."),
+      top: z.number().int().min(1).max(200).optional().describe("Rows by supply (default 20, max 200)."),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ underlying, issuer, chain, top }: { underlying?: string; issuer?: string; chain?: string; top?: number }) => {
+    try {
+      const params = new URLSearchParams();
+      if (underlying) params.set("underlying", underlying.toUpperCase());
+      if (issuer) params.set("issuer", issuer);
+      if (chain) params.set("chain", chain);
+      params.set("top", String(top ?? 20));
+      const path = `/api/public/tokenized-stocks?${params.toString()}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_open_interest",
   {
     title: "Intraday open interest and leverage regimes (10 major perps)",
