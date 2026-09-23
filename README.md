@@ -2,7 +2,7 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-49 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals (funding arbitrage additionally compares OKX, Bybit, Gate, HTX, BingX, Kraken, MEXC and Bitget).
+49 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
 
 ## Hosted endpoint (no install)
 

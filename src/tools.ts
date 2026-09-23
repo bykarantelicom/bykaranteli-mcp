@@ -201,7 +201,7 @@ server.registerTool(
   {
     title: "Crypto liquidations: daily long/short totals per symbol and exchange",
     description:
-      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own Binance, Bybit, OKX, Gate, HTX and dYdX stream collectors (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
+      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own stream collectors on every liquidation venue it counts, listed on bykaranteli.com/coverage (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
     inputSchema: {
       symbol: z
         .string()
@@ -658,7 +658,7 @@ server.registerTool(
   {
     title: "Exchange insurance funds: size, 24h and 7d change, fund against open interest, daily history",
     description:
-      "Call this when the user asks how big an exchange's insurance fund is, whether a fund is shrinking or was used after a crash, how much exchanges hold to absorb bankrupt liquidations, or how a fund compares with the venue's open interest. Returns the latest hourly reading per covered venue (Binance, Bybit, OKX and Gate): the fund in USD (OKX's own published total, the sum of priced pools elsewhere), per asset, 24h and 7d change, the fund as a percent of the venue's perpetual open interest on the coins ByKaranteli tracks, and daily closes per venue. Set pools to include every pool row (the contracts it covers, asset, balance, USD). A fund is a balance the venue reports, not an audit of its reserves.",
+      "Call this when the user asks how big an exchange's insurance fund is, whether a fund is shrinking or was used after a crash, how much exchanges hold to absorb bankrupt liquidations, or how a fund compares with the venue's open interest. Returns the latest hourly reading per covered venue (every exchange the insurance fund board lists): the fund in USD (OKX's own published total, the sum of priced pools elsewhere), per asset, 24h and 7d change, the fund as a percent of the venue's perpetual open interest on the coins ByKaranteli tracks, and daily closes per venue. Set pools to include every pool row (the contracts it covers, asset, balance, USD). A fund is a balance the venue reports, not an audit of its reserves.",
     inputSchema: {
       venue: z.enum(["binance", "bybit", "okx", "gate"]).optional().describe("One venue; omit for every covered venue."),
       history_days: z.number().int().min(1).max(366).optional().describe("Days of daily closes (default 30, max 366)."),
@@ -1027,7 +1027,7 @@ server.registerTool(
   {
     title: "New and delisted perpetual contracts",
     description:
-      "Call this when the user asks what new perpetuals were listed, which exchange listed a coin first, or about delistings. Returns listings and delistings across six exchanges from the hourly scan.",
+      "Call this when the user asks what new perpetuals were listed, which exchange listed a coin first, or about delistings. Returns listings and delistings across every exchange the hourly scan covers.",
     inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Window in days, 1-30 (default 30). Longer listing history is the listings dataset at bykaranteli.com/data.") },
     annotations: READ_ONLY,
   },
@@ -1084,7 +1084,7 @@ server.registerTool(
   {
     title: "LiqMap: estimated liquidation clusters with real prints overlaid",
     description:
-      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from six venues. Without an account key (or on the Free plan) the 24h view; with a Builder or higher key (BYKARANTELI_API_KEY) every timeframe from 1h to 30d.",
+      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). Without an account key (or on the Free plan) the 24h view; with a Builder or higher key (BYKARANTELI_API_KEY) every timeframe from 1h to 30d.",
     inputSchema: {
       symbol: z
         .string()
@@ -1230,9 +1230,9 @@ server.registerTool(
 server.registerTool(
   "get_positioning",
   {
-    title: "Positioning: long/short ratios, taker buy/sell and CVD on Binance, Bybit, OKX, Gate, HTX, Bitget",
+    title: "Positioning: long/short ratios, taker buy/sell and CVD across exchanges",
     description:
-      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps on Binance, Bybit, OKX, Gate, HTX and Bitget (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume, Gate account and top-trader ratios, HTX elite ratios, Bitget account and position ratios) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes.",
+      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps on every perpetual venue the positioning board records (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume, Gate account and top-trader ratios, HTX elite ratios, Bitget account and position ratios) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes.",
     inputSchema: {
       symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,24}$/).optional().describe("One Binance symbol, e.g. BTCUSDT"),
     },
