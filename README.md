@@ -54,7 +54,7 @@ Requires Node.js 18 or newer.
 | `get_liquidations` | "How much was liquidated today?", "Did longs or shorts get flushed this week?" |
 | `get_liquidation_leaderboard` | "What was the biggest liquidation today?", "When do liquidations cluster, Asia or US hours?" |
 | `get_insurance_funds` | "How big is the Binance insurance fund?", "Did any exchange insurance fund shrink this week?" |
-| `get_tokenized_stocks` | "How much tokenized Tesla exists onchain?", "Which tokenized stock trades furthest from the real share?" |
+| `get_tokenized_stocks` | "How much tokenized Tesla exists onchain?", "Which tokenized stock trades furthest from the real share?", "Which price valued this wrapper's supply?" (`price_source`, `totals.priced_by`) |
 | `get_etf_flows` | "Did the Bitcoin ETFs buy or sell yesterday?", "Cumulative ETH ETF inflow?" |
 | `get_cot_positioning` | "Are hedge funds long or short Bitcoin?", "What did the COT report show?" |
 | `get_options_snapshot` | "Where are the BTC option walls?", "What is DVOL / the zero-gamma level?" |
