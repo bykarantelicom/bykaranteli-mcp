@@ -2,12 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-50 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series, a monthly x402 catalog allowance). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
+51 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series, a monthly x402 catalog allowance). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 50 tools, nothing to install. Every tool call needs your
+assistant. Same 51 tools, nothing to install. Every tool call needs your
 account key (free at <https://bykaranteli.com/dashboard/api>); connecting and
 listing the tools work without one. The key travels one of three ways:
 
@@ -100,6 +100,7 @@ Requires Node.js 18 or newer.
 | `get_coverage` | "Which exchanges are behind your liquidation totals? How fresh is the data?" |
 | `get_orderbook_depth` | "Where is the biggest BTC bid wall? How deep is ETH within 2% on Coinbase vs Binance?" |
 | `get_jupiter_perps` | "How much long vs short OI is on Jupiter SOL perps? Who topped Jupiter this week? What is the JLP APR?" |
+| `get_solana_perps` | "Which Solana perp DEX has the most open interest? What is Pacifica's BTC funding and 24h volume? Jupiter versus Pacifica?" |
 | `get_turkey_premium` | "What do lira buyers pay for bitcoin above the world price? What is the Turkey Premium Index and its score right now? Which Turkish exchange is dearest? What is USDT/TRY against the official rate?" |
 | `get_data_proof` | "Can I verify a ByKaranteli number was not changed later? Show the on-chain proof for BTC funding right now. Which Solana transaction sealed the newest epoch?" |
 | `get_cycle_indicators` | "Has the Pi Cycle crossed? Mayer Multiple and Puell today?" |

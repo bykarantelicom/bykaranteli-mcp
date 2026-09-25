@@ -1361,6 +1361,34 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_solana_perps",
+  {
+    title: "Solana Perps board: open interest, 24h volume and hourly rates across Solana perpetual venues (Jupiter, Pacifica)",
+    description:
+      "Call this when the user asks about perpetuals on Solana as a whole, which Solana perp DEX has the most open interest or volume, Pacifica markets (funding, open interest, 24h volume, mark) or how Jupiter compares with an order-book venue. Returns every venue summed and every market largest first, refreshed every 10 minutes; a venue filter and hourly history of one Pacifica market (up to 30 days) are optional. Jupiter-only detail (long versus short, utilization, JLP, top traders) is get_jupiter_perps.",
+    inputSchema: {
+      venue: z.string().trim().toLowerCase().regex(/^(jupiter|pacifica)$/).optional().describe("Venue filter: jupiter or pacifica"),
+      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9_.-]{1,24}$/).optional().describe("Pacifica market symbol for hourly history, e.g. SOL or BTC"),
+      history_days: z.number().int().min(1).max(30).optional().describe("Hourly history for the symbol, 1..30 days"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ venue, symbol, history_days }: { venue?: string; symbol?: string; history_days?: number }) => {
+    try {
+      const q = new URLSearchParams();
+      if (venue) q.set("venue", venue);
+      if (symbol) q.set("symbol", symbol);
+      if (history_days) q.set("days", String(history_days));
+      const qs = q.toString();
+      const path = `/api/public/solana-perps${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_coverage",
   {
     title: "Coverage registry: which venues and data types we collect, how, and how fresh",
