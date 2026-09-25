@@ -143,7 +143,7 @@ Server: MIT. Data: personal and research use with attribution "ByKaranteli (byka
 | Business | $149 / mo | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, 10,000 x402 catalog calls a month, monthly bulk |
 | Scale | $399 / mo | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog with no ceiling, daily raw |
 
-From 2026-10-01 a Free or Terminal key past its monthly figure gets 429 until
+A Free or Terminal key past its monthly figure gets 429 until
 the month resets. A paid key past its fair use is never stopped: it answers at
 the Free rate (30 a minute) until the month resets, with `x-quota-state: slow`
 on every answer.
