@@ -100,7 +100,7 @@ Requires Node.js 18 or newer.
 | `get_coverage` | "Which exchanges are behind your liquidation totals? How fresh is the data?" |
 | `get_orderbook_depth` | "Where is the biggest BTC bid wall? How deep is ETH within 2% on Coinbase vs Binance?" |
 | `get_jupiter_perps` | "How much long vs short OI is on Jupiter SOL perps? Who topped Jupiter this week? What is the JLP APR?" |
-| `get_solana_perps` | "Which Solana perp DEX has the most open interest? What is Pacifica's BTC funding and 24h volume? Jupiter versus Pacifica?" |
+| `get_solana_perps` | "Which Solana perp DEX has the most open interest? What is Pacifica's BTC funding and 24h volume? Phoenix SOL open interest? GM Trade versus Jupiter?" |
 | `get_turkey_premium` | "What do lira buyers pay for bitcoin above the world price? What is the Turkey Premium Index and its score right now? Which Turkish exchange is dearest? What is USDT/TRY against the official rate?" |
 | `get_data_proof` | "Can I verify a ByKaranteli number was not changed later? Show the on-chain proof for BTC funding right now. Which Solana transaction sealed the newest epoch?" |
 | `get_cycle_indicators` | "Has the Pi Cycle crossed? Mayer Multiple and Puell today?" |

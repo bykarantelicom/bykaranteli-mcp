@@ -1363,12 +1363,12 @@ server.registerTool(
 server.registerTool(
   "get_solana_perps",
   {
-    title: "Solana Perps board: open interest, 24h volume and hourly rates across Solana perpetual venues (Jupiter, Pacifica)",
+    title: "Solana Perps board: open interest, 24h volume and hourly rates across six Solana perpetual venues (Jupiter, Pacifica, Phoenix, GM Trade, Velocity, Bullet)",
     description:
-      "Call this when the user asks about perpetuals on Solana as a whole, which Solana perp DEX has the most open interest or volume, Pacifica markets (funding, open interest, 24h volume, mark) or how Jupiter compares with an order-book venue. Returns every venue summed and every market largest first, refreshed every 10 minutes; a venue filter and hourly history of one Pacifica market (up to 30 days) are optional. Jupiter-only detail (long versus short, utilization, JLP, top traders) is get_jupiter_perps.",
+      "Call this when the user asks about perpetuals on Solana as a whole, which Solana perp DEX has the most open interest or volume, a market on Pacifica, Phoenix, GM Trade (GMX on Solana), Velocity (the Drift relaunch) or Bullet (funding, open interest, 24h volume, mark), or how Jupiter compares with the order-book venues. Returns the board read every 10 minutes: per-venue totals (one-sided open interest, both sides on pool venues, 24h volume, market count, median hourly rate, as_of), every market of every venue largest first with instrument type (perpetual, equity, index, commodity, fx), and optional hourly history of one market on any venue but Jupiter (7 days free, 30 with member depth; Jupiter history is get_jupiter_perps).",
     inputSchema: {
-      venue: z.string().trim().toLowerCase().regex(/^(jupiter|pacifica)$/).optional().describe("Venue filter: jupiter or pacifica"),
-      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9_.-]{1,24}$/).optional().describe("Pacifica market symbol for hourly history, e.g. SOL or BTC"),
+      venue: z.string().trim().toLowerCase().regex(/^(jupiter|pacifica|phoenix|gmtrade|velocity|bullet)$/).optional().describe("Venue filter: jupiter, pacifica, phoenix, gmtrade, velocity or bullet"),
+      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9_.-]{1,24}$/).optional().describe("Market symbol on the chosen venue (Pacifica when venue is not given) for hourly history, e.g. SOL, SOL-PERP, SOL-USD"),
       history_days: z.number().int().min(1).max(30).optional().describe("Hourly history for the symbol, 1..30 days"),
     },
     annotations: READ_ONLY,
