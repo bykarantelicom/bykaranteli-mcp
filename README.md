@@ -7,10 +7,19 @@ MCP (Model Context Protocol) server for **live crypto derivatives data**: fundin
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 50 tools, nothing to install. Without a key it runs on the
-shared Free pool; a connector header with your account key, `x-api-key: bk_...`
-(claude.ai custom connectors) or `Authorization: Bearer bk_...` (Builder and
-above), brings your own rate limit and member depth.
+assistant. Same 50 tools, nothing to install. Every tool call needs your
+account key (free at <https://bykaranteli.com/dashboard/api>); connecting and
+listing the tools work without one. The key travels one of three ways:
+
+- the request header `x-api-key: bk_...` (claude.ai custom connectors, Cursor,
+  Claude Code);
+- the request header `Authorization: Bearer bk_...`;
+- the address `https://mcp.bykaranteli.com/?key=bk_...` for clients that cannot
+  send headers (ChatGPT). Treat that address like a password and revoke the key
+  if it leaks.
+
+A free account covers the API and the hosted MCP on one monthly counter;
+Builder and above bring higher rates and member depth.
 
 ## Quick start
 
