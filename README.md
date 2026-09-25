@@ -2,7 +2,7 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-50 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute, public depth), and the Builder, Business and Scale plans raise the rate and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
+50 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series, a monthly x402 catalog allowance). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
 
 ## Hosted endpoint (no install)
 
@@ -135,16 +135,23 @@ Server: MIT. Data: personal and research use with attribution "ByKaranteli (byka
 
 ## Plans and paid depth
 
-| Plan | Price | Rate | Depth |
-|---|---|---|---|
-| Free API | $0 | 30 / min | public pages |
-| Builder | $49 / mo | 300 / min | member depth, x402 catalog included |
-| Business | $149 / mo | 1,200 / min | member depth, commercial licence, monthly bulk |
-| Scale | $399 / mo | 3,000 / min | member depth, derived redistribution, daily raw |
+| Plan | Price | Rate | Monthly | Depth |
+|---|---|---|---|---|
+| Free API | $0 | 30 / min | 15,000 | public pages |
+| Terminal | $29 / mo | 60 / min | 150,000 | public pages |
+| Builder | $49 / mo | 300 / min | 1,000,000 fair use | member depth, 1,000 x402 catalog calls a month |
+| Business | $149 / mo | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, 10,000 x402 catalog calls a month, monthly bulk |
+| Scale | $399 / mo | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog with no ceiling, daily raw |
+
+From 2026-10-01 a Free or Terminal key past its monthly figure gets 429 until
+the month resets. A paid key past its fair use is never stopped: it answers at
+the Free rate (30 a minute) until the month resets, with `x-quota-state: slow`
+on every answer.
 
 Full table: <https://bykaranteli.com/developers#tiers>. For recorded history and
 raw records beyond the live snapshots, bykaranteli.com also exposes pay-per-call
 x402 endpoints for anonymous agents (USDC on Solana or Base, priced per call,
 no account): <https://bykaranteli.com/developers#x402> · machine catalog:
-<https://bykaranteli.com/api/x402>. Builder and higher keys call those routes
-unpaid within their plan limits.
+<https://bykaranteli.com/api/x402>. Builder keys call those routes unpaid up to
+1,000 calls a month, Business up to 10,000, Scale with no ceiling; past the
+allowance a key pays per call like an anonymous agent or moves up a plan.
