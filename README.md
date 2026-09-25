@@ -21,6 +21,8 @@ listing the tools work without one. The key travels one of three ways:
 A free account covers the API and the hosted MCP on one monthly counter;
 Builder and above bring higher rates and member depth.
 
+Step-by-step guide for beginners: https://bykaranteli.com/guide/connect
+
 ## Quick start
 
 ### Claude Code
