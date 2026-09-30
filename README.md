@@ -2,7 +2,7 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-60 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included in the monthly fair use). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
+67 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included in the monthly fair use). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
 
 ## Hosted endpoint (no install)
 
@@ -116,6 +116,10 @@ Requires Node.js 18 or newer.
 | `get_quantum_exposure` | "How much Bitcoin is quantum-vulnerable?", "What is the P2PK exposure?" |
 | `get_liqmap` | "Where are the BTC liquidation clusters?", "Where would leveraged longs get liquidated?" |
 | `get_market_profile` | "Where is the BTC point of control today?", "What was yesterday's value area?", "Which naked POCs are still untested?" |
+| `get_options_chain` | "How did BTC open interest move by strike today?", "Where is ETH ATM IV hour by hour?", "Which expiry gained the most open interest in 24h?" |
+| `get_hl_positions` | "Where do Hyperliquid whales get liquidated on BTC?", "How much tracked notional sits below price?", "Does the model agree with the tracked positions?" |
+| `get_venue_share` | "Which exchange had the most liquidations this week?", "How is perp open interest split by venue?" |
+| `get_tradfi_gaps` | "What did the TSLA perp do over the weekend?", "How big was the Monday open gap on NVDA?", "How far apart were the venues overnight?" |
 | `get_series` | "BTC open interest by hour for the last week?", "ETH funding on OKX since 1 September?", "Daily Coinbase premium this month?" (metric list, units and finest periods: <https://bykaranteli.com/api/series/metrics>) |
 
 All market answers are JSON and carry a `generatedAt` timestamp, a `source` URL to the human-readable page and a `provenance` block: `source_page`, `api_path`, the answer's own `generated_at`, `fetched_at`, and when the answer carries them the `venues` behind the number, `coverage` (`full`, `sampled` or `mixed`), `stale_venues` and `recorded_since`, plus the `proof` page (<https://bykaranteli.com/proof>). A field the answer does not carry is left out, never filled in. Symbols accept both `BTCUSDT` and bare `BTC`.
@@ -133,6 +137,9 @@ These tools read and change your own ByKaranteli account with the same key: the 
 | `list_watchlists` | Lists your watchlists and the symbols on each. |
 | `add_watchlist_symbol` | Adds a symbol to your default list or the list you name (writes to your account). |
 | `remove_watchlist_symbol` | Removes a symbol from a list (writes to your account). |
+| `list_tracked_addresses` | Lists the Hyperliquid addresses you follow, with their last positions (reads your account). |
+| `add_tracked_address` | Follows a Hyperliquid address for position alerts (writes to your account; Terminal and above). |
+| `remove_tracked_address` | Stops following an address (writes to your account). |
 
 - The write tools carry `readOnlyHint: false` (and `destructiveHint: true` for the two that remove something), so clients that ask before a change will ask.
 - How many recipes an account keeps follows its plan; past it, `create_alert_recipe` answers with the limit instead of saving.

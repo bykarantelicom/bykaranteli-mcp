@@ -4,9 +4,16 @@ Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Cha
 
 ## [0.31.0] - 2026-10-01
 
-60 tools.
+67 tools.
 
 ### Added
+
+- `get_options_chain`: the option chain hour by hour from ByKaranteli's own capture of every listed venue: open interest and mark IV per expiry and strike, the change over 1h and 24h, the front expiry's ATM IV path.
+- `get_hl_positions`: the liquidation price map of the largest Hyperliquid accounts per coin, with a comparison against the LiqMap model and an hourly archive.
+- `get_venue_share`: each counted exchange's share of the recorded liquidations and of perpetual open interest over 1, 7 or 30 days.
+- `get_tradfi_gaps`: stock, index and commodity perpetuals against the cash close over weekends and nights, checkpoint by checkpoint, with the realised open gap.
+- Account tools for Hyperliquid address tracking (Terminal and above): `list_tracked_addresses`, `add_tracked_address`, `remove_tracked_address`.
+- OAuth 2.1 sign-in on the hosted endpoint: the client registers itself, the user approves once, the token runs on the account's own key; the key path stays.
 
 - `get_series`: the recorded series of one metric for one perpetual (price candles, volume, perp and spot CVD, open interest, funding, liquidations, long/short ratios, RSI, Coinbase premium, ETF flows, borrow rates, Hyperliquid whale net), by period, window (`from`, `to`) or newest bars, on another venue for price, OI, funding and borrow; `/api/series`, metric list at `/api/series/metrics`.
 - Account tools that act on your own account with your key: `list_alert_recipes`, `create_alert_recipe`, `delete_alert_recipe`, `list_watchlists`, `add_watchlist_symbol`, `remove_watchlist_symbol`. The four that change something are annotated `readOnlyHint: false` (the two that remove, `destructiveHint: true`), count on the key's plan, are rate limited per key and recorded on the account; the plan's recipe limit comes back as the tool answer.

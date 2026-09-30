@@ -1392,6 +1392,112 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_options_chain",
+  {
+    title: "Options chain hour by hour: open interest and IV per expiry and strike, the change over 1h and 24h, the ATM IV path",
+    description:
+      "Call this when the user asks how the BTC or ETH option chain moved today or over the last day: open interest and mark IV per expiry and strike from ByKaranteli's own hourly capture of every listed venue, the change over the last hour and the last 24 hours, and the front expiry's ATM IV hour by hour. Anonymous depth lists the largest strikes; a key with member depth lists every strike. Recorded from 2026-10-01, so the first days carry a short history.",
+    inputSchema: {
+      currency: z.enum(["BTC", "ETH"]).optional().describe("BTC or ETH (default BTC)"),
+      venue: z.enum(["all", "deribit", "bybit", "binance", "okx", "delta"]).optional().describe("One venue or all (default all)"),
+      expiry: z.string().trim().toUpperCase().regex(/^\d{1,2}[A-Z]{3}\d{2}$/).optional().describe("Expiry as DDMONYY, e.g. 31OCT26 (default: every expiry)"),
+      strikes: z.enum(["top", "all"]).optional().describe("top (largest strikes) or all (member depth)"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ currency, venue, expiry, strikes }: { currency?: string, venue?: string, expiry?: string, strikes?: string }) => {
+    try {
+      const q = new URLSearchParams();
+      if (currency !== undefined) q.set("currency", String(currency));
+      if (venue !== undefined) q.set("venue", String(venue));
+      if (expiry !== undefined) q.set("expiry", String(expiry));
+      if (strikes !== undefined) q.set("strikes", String(strikes));
+      const qs = q.toString();
+      const path = `/api/public/options/chain${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_hl_positions",
+  {
+    title: "Hyperliquid tracked positions: the liquidation price map of the largest accounts per coin, against the LiqMap model",
+    description:
+      "Call this when the user asks where Hyperliquid whales would be liquidated, how much tracked notional sits at each price, how the largest accounts lean on a coin, or how their liquidation prices compare with the LiqMap model. The universe is the largest accounts by equity on Hyperliquid's public leaderboard, scanned every five minutes; the levels are their own liquidation prices bucketed around the mark. hours returns the hourly archive of level totals.",
+    inputSchema: {
+      coin: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,24}$/).optional().describe("Coin as Hyperliquid names it, e.g. BTC, ETH, SOL (default BTC)"),
+      hours: z.number().int().min(1).max(720).optional().describe("Hours of archive to return, 1..720 (default 24)"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ coin, hours }: { coin?: string, hours?: number }) => {
+    try {
+      const q = new URLSearchParams();
+      if (coin !== undefined) q.set("coin", String(coin));
+      if (hours !== undefined) q.set("hours", String(hours));
+      const qs = q.toString();
+      const path = `/api/public/hyperliquid-positions${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_venue_share",
+  {
+    title: "Venue share: each counted exchange's share of the recorded liquidations and of perpetual open interest",
+    description:
+      "Call this when the user asks which exchange sees the most liquidations, how that share moved this week or this month, or how perpetual open interest splits between venues. Shares over one, seven or thirty days from ByKaranteli's own hourly liquidation record (counted venues only, each with the day its record started) and the hourly open interest record.",
+    inputSchema: {
+      days: z.number().int().optional().describe("Window in days: 1, 7 or 30 (default 7)"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ days }: { days?: number }) => {
+    try {
+      const q = new URLSearchParams();
+      if (days !== undefined) q.set("days", String(days));
+      const qs = q.toString();
+      const path = `/api/public/venue-share${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_tradfi_gaps",
+  {
+    title: "Weekend and overnight gaps: stock, index and commodity perpetuals against the cash close, checkpoint by checkpoint",
+    description:
+      "Call this when the user asks what a stock, index or commodity perpetual did over the weekend or overnight while the cash market was closed, how far it sat from the last cash close at each checkpoint, how the venues disagreed, and what gap the next open then realised. From ByKaranteli's own ten-minute venue record; window weekend or night; one symbol or the whole board.",
+    inputSchema: {
+      window: z.enum(["weekend", "night"]).optional().describe("weekend (Friday close to Monday open) or night (cash close to next open); default weekend"),
+      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9.]{1,24}$/).optional().describe("One underlying, e.g. TSLA or XAU (default: the whole board)"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ window, symbol }: { window?: string, symbol?: string }) => {
+    try {
+      const q = new URLSearchParams();
+      if (window !== undefined) q.set("window", String(window));
+      if (symbol !== undefined) q.set("symbol", String(symbol));
+      const qs = q.toString();
+      const path = `/api/public/tradfi-gaps${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_solana_perps",
   {
     title: "Solana Perps board: open interest, 24h volume and hourly rates across six Solana perpetual venues (Jupiter, Pacifica, Phoenix, GM Trade, Velocity, Bullet)",
@@ -1757,6 +1863,54 @@ server.registerTool("remove_watchlist_symbol", {
   const r = await account("DELETE", `/api/member/watchlists/${encodeURIComponent(list.list.id)}/items?symbol=${encodeURIComponent(symbol)}`);
   if (!r.ok) return r.result;
   return okResult({ ...r.data, watchlist: { id: list.list.id, name: list.list.name }, note: r.data.deleted === false ? "Was not on this list." : undefined });
+});
+
+/* Hyperliquid address tracking (Terminal feature, 2026-10-01): the member routes /api/member/hl-addresses take the
+ * account key like the alert and watchlist routes. */
+const HL_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const TRACKED_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+server.registerTool("list_tracked_addresses", {
+  title: "List the Hyperliquid addresses you follow (reads your account)",
+  description: "Call this when the user asks which Hyperliquid addresses they follow, or what those addresses hold right now. Returns every followed address with its label, the positions last seen on it and the plan's address limit; following addresses is part of Terminal and the plans above it.",
+  inputSchema: {},
+  annotations: ACCOUNT_READ,
+}, async () => {
+  const r = await account("GET", "/api/member/hl-addresses");
+  if (!r.ok) return r.result;
+  return okResult(r.data);
+});
+
+server.registerTool("add_tracked_address", {
+  title: "Follow a Hyperliquid address for position alerts (writes to your account)",
+  description: "Call this when the user asks to follow, track or get alerts for a Hyperliquid address (0x followed by 40 hex characters). Every later position change of the address (opened, closed, increased, reduced, flipped) reaches the user's alert channels; the first sight is the baseline and sends nothing. Counted against the plan's address limit; the route answers terminal_required or limit_reached when it cannot add.",
+  inputSchema: {
+    address: z.string().describe("string, 0x followed by 40 hex characters"),
+    label: z.string().optional().describe("string, optional name for the address, up to 40 characters"),
+  },
+  annotations: ACCOUNT_WRITE_IDEMPOTENT,
+}, async (args: Record<string, unknown> = {}) => {
+  const address = typeof args.address === "string" ? args.address.trim().toLowerCase() : "";
+  if (!HL_ADDRESS_RE.test(address)) return errorResult("Invalid input: address is 0x followed by 40 hex characters.");
+  const label = typeof args.label === "string" ? args.label.trim().slice(0, 40) : undefined;
+  const r = await account("POST", "/api/member/hl-addresses", { address, ...(label ? { label } : {}) });
+  if (!r.ok) return r.result;
+  return okResult(r.data);
+});
+
+server.registerTool("remove_tracked_address", {
+  title: "Stop following a Hyperliquid address (writes to your account)",
+  description: "Call this when the user asks to stop following or tracking a Hyperliquid address. Takes the id from list_tracked_addresses; the address's alerts stop, its recorded events stay.",
+  inputSchema: {
+    id: z.string().describe("string, the id from list_tracked_addresses"),
+  },
+  annotations: ACCOUNT_DELETE,
+}, async (args: Record<string, unknown> = {}) => {
+  const id = typeof args.id === "string" ? args.id.trim() : "";
+  if (!TRACKED_ID_RE.test(id)) return errorResult("Invalid input: id is the value list_tracked_addresses returns.");
+  const r = await account("DELETE", `/api/member/hl-addresses/${encodeURIComponent(id)}`);
+  if (!r.ok) return r.result;
+  return okResult(r.data);
 });
 
 }
