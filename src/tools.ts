@@ -1081,7 +1081,7 @@ server.registerTool(
     title: "Macro liquidity: Fed funds, 10y, balance sheet, RRP, stablecoin supply",
     description:
       "Call this when the user asks about macro liquidity, the Fed balance sheet, reverse repo, rates or stablecoin supply in relation to crypto. Returns the recorded daily series and latest values.",
-    inputSchema: { days: z.number().int().min(1).max(730).optional().describe("Window in days, 1-730 (default 365).") },
+    inputSchema: { days: z.number().int().min(30).max(4000).optional().describe("Window in days, 30-4000 (default 365); the route clamps to that range.") },
     annotations: READ_ONLY,
   },
   async (args) => {
@@ -1100,7 +1100,7 @@ server.registerTool(
     title: "Bitcoin network health from our own node",
     description:
       "Call this when the user asks about Bitcoin hashrate, difficulty or block fees (our node runs blocksonly, so there is no mempool series). Returns the recorded daily series and latest values measured on ByKaranteli's own node.",
-    inputSchema: { days: z.number().int().min(1).max(730).optional().describe("Window in days, 1-730 (default 365).") },
+    inputSchema: { days: z.number().int().min(30).max(4000).optional().describe("Window in days, 30-4000 (default 365); the route clamps to that range.") },
     annotations: READ_ONLY,
   },
   async (args) => {
