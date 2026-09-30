@@ -1370,6 +1370,31 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_market_profile",
+  {
+    title: "Market Profile: daily TPO profile of a perpetual, point of control, value area, initial balance, naked POCs",
+    description:
+      "Call this when the user asks about a perpetual's Market Profile, TPO profile, point of control (POC), value area (VAH, VAL), initial balance or naked (untested) points of control. Returns one row per closed UTC day from ByKaranteli's own one-minute bars of the Binance USDT-M perpetual (30-minute TPO periods, buckets of 0.05% of the day's open, 70% value area, first-hour initial balance, volume point of control), the naked points of control of the last 60 recorded days and the latest day's profile per price bucket. Symbols without recorded minute bars return no_profile.",
+    inputSchema: {
+      symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,20}$/).optional().describe("Ticker such as BTC or BTCUSDT (default BTC)"),
+      days: z.number().int().min(1).max(30).optional().describe("Closed UTC days, newest first, 1..30 (default 7)"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ symbol, days }: { symbol?: string; days?: number }) => {
+    try {
+      const q = new URLSearchParams();
+      q.set("symbol", symbol ?? "BTC");
+      if (days) q.set("days", String(days));
+      const path = `/api/public/market-profile?${q.toString()}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_solana_perps",
   {
     title: "Solana Perps board: open interest, 24h volume and hourly rates across six Solana perpetual venues (Jupiter, Pacifica, Phoenix, GM Trade, Velocity, Bullet)",

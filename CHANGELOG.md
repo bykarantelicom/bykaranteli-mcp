@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.30.8] - 2026-10-01
+
+52 tools.
+
+### Added
+
+- `get_market_profile`: the daily TPO Market Profile of a Binance USDT-M perpetual from ByKaranteli's own minute bars (point of control, 70% value area, first-hour initial balance, volume point of control, naked points of control of the last 60 recorded days, the latest day's profile per bucket); `/api/public/market-profile`.
+
 ## [0.30.7] - 2026-09-30
 
 51 tools.
