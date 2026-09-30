@@ -91,6 +91,10 @@ const PAGE_FOR_STEM: Record<string, string> = {
   "/venues/markets": "/venues",
   "/venues/lead-lag": "/venues",
   "/venues/profile": "/venues",
+  "/venues/oi-history": "/venues",
+  "/options/surface": "/options",
+  "/context": "/methodology",
+  "/leverage-tiers": "/leverage",
   "/datasets/etf-flows": "/etf",
   "/datasets/liquidations-daily": "/liquidations",
 };
@@ -501,7 +505,7 @@ server.registerTool(
   {
     title: "Options walls, gamma exposure and DVOL (BTC + ETH)",
     description:
-      "Call this when the user asks where the big options bets sit, about call/put walls, gamma exposure (GEX), the zero-gamma level, implied volatility (DVOL) or the IV term structure for Bitcoin or Ethereum, across options venues or on one venue. Daily snapshot of the listed option chains of every options venue we record, summed by default or one venue with venue: top strikes by open interest, put/call ratio, dealer hedging map, ATM IV by expiry and each venue's open interest (venues_included). DVOL is Deribit's index whatever the venue.",
+      "Call this when the user asks where the big options bets sit, about call/put walls, gamma exposure (GEX), the zero-gamma level, implied volatility (DVOL) or the IV term structure for Bitcoin or Ethereum, across options venues or on one venue. Daily snapshot of the listed option chains of every options venue we record, summed by default or one venue with venue: the call wall (largest call open interest above spot) and put wall (largest put open interest below spot), the largest bars on the whole axis, top strikes by open interest, put/call ratio, dealer hedging map, ATM IV by expiry (calls and puts interpolated at the money, iv_source names the venue whose quotes price the chain) and each venue's open interest (venues_included). DVOL is Deribit's index whatever the venue.",
     inputSchema: {
       venue: z.enum(["all", "deribit", "bybit", "binance", "okx", "delta"]).optional().describe("all (default) sums every options venue; or one venue id: deribit, bybit, binance, okx or delta (Delta Exchange India)."),
     },
@@ -558,7 +562,7 @@ server.registerTool(
   {
     title: "Options tape: biggest prints and premium flow (BTC + ETH)",
     description:
-      "Call this when the user asks what big options players are buying, about block trades, or whether call or put premium dominates today. Returns 24h call vs put premium bought, the block-trade share, and the largest prints of the last 48 hours with strikes, premium, IV and venue (Deribit or OKX). Updated every 15 minutes.",
+      "Call this when the user asks what big options players are buying, about block trades, or whether call or put premium dominates today. Returns 24h call vs put premium bought (net of the sold legs of the same multi-leg block or combo, so a spread counts its net premium), the block-trade share, the multi-leg structure count, and the largest prints of the last 48 hours with strikes, premium, IV, structure id and venue (Deribit or OKX). Updated every 15 minutes.",
     inputSchema: {},
     annotations: READ_ONLY,
   },
