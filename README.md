@@ -132,6 +132,8 @@ npm run build
 node dist/index.js   # speaks MCP over stdio
 ```
 
+Release notes per version: [CHANGELOG.md](https://github.com/bykarantelicom/bykaranteli-mcp/blob/main/CHANGELOG.md).
+
 ## License
 
 Server: MIT. Data: personal and research use with attribution "ByKaranteli (bykaranteli.com)"; commercial use with the Business plan. Licence text: <https://bykaranteli.com/data#license>.
