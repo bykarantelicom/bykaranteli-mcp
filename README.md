@@ -18,6 +18,13 @@ listing the tools work without one. The key travels one of three ways:
   send headers (ChatGPT). Treat that address like a password and revoke the key
   if it leaks.
 
+Or sign in with OAuth 2.1 where the client offers it (claude.ai custom
+connectors: Authentication, Sign in; ChatGPT connectors: OAuth): the client
+registers itself (RFC 7591, PKCE S256), you approve it once on bykaranteli.com
+and it runs on a key of your own account, which the Data and API page lists
+under connected apps. Discovery:
+<https://mcp.bykaranteli.com/.well-known/oauth-protected-resource>.
+
 A free account covers the API and the hosted MCP on one monthly counter;
 Builder and above bring higher rates and member depth.
 
@@ -137,7 +144,7 @@ These tools read and change your own ByKaranteli account with the same key: the 
 | Env var | Default | Purpose |
 |---|---|---|
 | `BYKARANTELI_API_KEY` | none | Account key (`bk_...`) sent as `Authorization: Bearer`. Free at <https://bykaranteli.com/dashboard/api>; required for programs from 2026-09-10 |
-| `BYKARANTELI_BASE_URL` | `https://bykaranteli.com` | Override the API host (testing only) |
+| `BYKARANTELI_BASE_URL` | `https://bykaranteli.com` | Override the API host (testing only). The key is sent to whatever host this names, so point it only at a server you trust. |
 
 ## Data notes
 

@@ -38,8 +38,10 @@ export function registerByKaranteliTools(server: McpServer, options?: RegisterOp
   const TIMEOUT_MS = 15_000;
   const STATIC_KEY = (options?.apiKey ?? process.env.BYKARANTELI_API_KEY ?? "").trim();
   const authorizationFor = (): string | undefined => {
-    const forwarded = options?.authorizationProvider?.();
-    if (forwarded) return forwarded;
+    /* A host that forwards its callers' keys (authorizationProvider) never falls back to a static key: on the
+     * hosted endpoint that fallback would have let every keyless caller act as whatever key the process held
+     * (security review 2026-09-30). The static key is for a local stdio server with one owner. */
+    if (options?.authorizationProvider) return options.authorizationProvider() || undefined;
     return STATIC_KEY ? `Bearer ${STATIC_KEY}` : undefined;
   };
 
