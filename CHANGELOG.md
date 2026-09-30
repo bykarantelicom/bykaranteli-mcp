@@ -2,7 +2,7 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
-## [0.31.0] - 2026-10-01
+## [0.31.0] - 2026-09-30
 
 67 tools.
 
@@ -24,7 +24,7 @@ Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Cha
 
 - The README plan table leaves prices to <https://bykaranteli.com/pricing>, and the x402 catalog is included in the monthly fair use of Builder and above (each call counts as 10 requests) instead of a separate monthly allowance.
 
-## [0.30.8] - 2026-10-01
+## [0.30.8] - 2026-09-30
 
 52 tools.
 

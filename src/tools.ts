@@ -1396,7 +1396,7 @@ server.registerTool(
   {
     title: "Options chain hour by hour: open interest and IV per expiry and strike, the change over 1h and 24h, the ATM IV path",
     description:
-      "Call this when the user asks how the BTC or ETH option chain moved today or over the last day: open interest and mark IV per expiry and strike from ByKaranteli's own hourly capture of every listed venue, the change over the last hour and the last 24 hours, and the front expiry's ATM IV hour by hour. Anonymous depth lists the largest strikes; a key with member depth lists every strike. Recorded from 2026-10-01, so the first days carry a short history.",
+      "Call this when the user asks how the BTC or ETH option chain moved today or over the last day: open interest and mark IV per expiry and strike from ByKaranteli's own hourly capture of every listed venue, the change over the last hour and the last 24 hours, and the front expiry's ATM IV hour by hour. Anonymous depth lists the largest strikes; a key with member depth lists every strike. Recorded from 2026-09-30, so the first days carry a short history.",
     inputSchema: {
       currency: z.enum(["BTC", "ETH"]).optional().describe("BTC or ETH (default BTC)"),
       venue: z.enum(["all", "deribit", "bybit", "binance", "okx", "delta"]).optional().describe("One venue or all (default all)"),
@@ -1865,7 +1865,7 @@ server.registerTool("remove_watchlist_symbol", {
   return okResult({ ...r.data, watchlist: { id: list.list.id, name: list.list.name }, note: r.data.deleted === false ? "Was not on this list." : undefined });
 });
 
-/* Hyperliquid address tracking (Terminal feature, 2026-10-01): the member routes /api/member/hl-addresses take the
+/* Hyperliquid address tracking (Terminal feature, 2026-09-30): the member routes /api/member/hl-addresses take the
  * account key like the alert and watchlist routes. */
 const HL_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const TRACKED_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
