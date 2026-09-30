@@ -2,6 +2,21 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.31.0] - 2026-10-01
+
+60 tools.
+
+### Added
+
+- `get_series`: the recorded series of one metric for one perpetual (price candles, volume, perp and spot CVD, open interest, funding, liquidations, long/short ratios, RSI, Coinbase premium, ETF flows, borrow rates, Hyperliquid whale net), by period, window (`from`, `to`) or newest bars, on another venue for price, OI, funding and borrow; `/api/series`, metric list at `/api/series/metrics`.
+- Account tools that act on your own account with your key: `list_alert_recipes`, `create_alert_recipe`, `delete_alert_recipe`, `list_watchlists`, `add_watchlist_symbol`, `remove_watchlist_symbol`. The four that change something are annotated `readOnlyHint: false` (the two that remove, `destructiveHint: true`), count on the key's plan, are rate limited per key and recorded on the account; the plan's recipe limit comes back as the tool answer.
+- `parse_alert_text`: a sentence such as "BTC funding above 0.05%" or "tell me when ETH drops 5% in a day" becomes the recipe it describes, with a confidence, a summary and what the text left open; rule based, saves nothing, never invents a threshold.
+- A `provenance` block on every market answer: source page, API path, the answer's own timestamp, fetch time, and when the answer carries them the venues, `full`, `sampled` or `mixed` coverage, stale feeds and first recorded day, plus the proof page.
+
+### Changed
+
+- The README plan table leaves prices to <https://bykaranteli.com/pricing>, and the x402 catalog is included in the monthly fair use of Builder and above (each call counts as 10 requests) instead of a separate monthly allowance.
+
 ## [0.30.8] - 2026-10-01
 
 52 tools.

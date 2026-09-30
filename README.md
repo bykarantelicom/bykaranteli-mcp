@@ -2,12 +2,12 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-52 read-only tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series, a monthly x402 catalog allowance). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
+60 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series, the x402 catalog included in the monthly fair use). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
 
 ## Hosted endpoint (no install)
 
 Paste `https://mcp.bykaranteli.com` as a custom connector in any MCP-capable
-assistant. Same 52 tools, nothing to install. Every tool call needs your
+assistant. The same tools, nothing to install. Every tool call needs your
 account key (free at <https://bykaranteli.com/dashboard/api>); connecting and
 listing the tools work without one. The key travels one of three ways:
 
@@ -109,8 +109,28 @@ Requires Node.js 18 or newer.
 | `get_quantum_exposure` | "How much Bitcoin is quantum-vulnerable?", "What is the P2PK exposure?" |
 | `get_liqmap` | "Where are the BTC liquidation clusters?", "Where would leveraged longs get liquidated?" |
 | `get_market_profile` | "Where is the BTC point of control today?", "What was yesterday's value area?", "Which naked POCs are still untested?" |
+| `get_series` | "BTC open interest by hour for the last week?", "ETH funding on OKX since 1 September?", "Daily Coinbase premium this month?" (metric list, units and finest periods: <https://bykaranteli.com/api/series/metrics>) |
 
-All responses are JSON and carry a `generatedAt` timestamp plus a `source` URL to the human-readable page. Symbols accept both `BTCUSDT` and bare `BTC`.
+All market answers are JSON and carry a `generatedAt` timestamp, a `source` URL to the human-readable page and a `provenance` block: `source_page`, `api_path`, the answer's own `generated_at`, `fetched_at`, and when the answer carries them the `venues` behind the number, `coverage` (`full`, `sampled` or `mixed`), `stale_venues` and `recorded_since`, plus the `proof` page (<https://bykaranteli.com/proof>). A field the answer does not carry is left out, never filled in. Symbols accept both `BTCUSDT` and bare `BTC`.
+
+## Account tools (alerts and watchlist)
+
+These tools read and change your own ByKaranteli account with the same key: the alert recipes that notify you on Telegram, email, push or webhook, and your watchlists. They never trade, move funds or touch another account.
+
+| Tool | What it does |
+|---|---|
+| `parse_alert_text` | Turns "BTC funding above 0.05%" or "tell me when ETH drops 5% in a day" into the exact recipe, with a confidence and what the text left open. Rule based; saves nothing, never invents a threshold. |
+| `list_alert_recipes` | Lists your alert recipes with their conditions, scope, channels and when each last fired. |
+| `create_alert_recipe` | Saves an alert recipe (writes to your account). |
+| `delete_alert_recipe` | Deletes one of your alert recipes by id (writes to your account). |
+| `list_watchlists` | Lists your watchlists and the symbols on each. |
+| `add_watchlist_symbol` | Adds a symbol to your default list or the list you name (writes to your account). |
+| `remove_watchlist_symbol` | Removes a symbol from a list (writes to your account). |
+
+- The write tools carry `readOnlyHint: false` (and `destructiveHint: true` for the two that remove something), so clients that ask before a change will ask.
+- How many recipes an account keeps follows its plan; past it, `create_alert_recipe` answers with the limit instead of saving.
+- Every call counts on the key's plan like any other request; writes are also rate limited per key, and each write is recorded on the account with the key that made it.
+- Recipes and watchlist changes show up at once on <https://bykaranteli.com/dashboard/alerts> and <https://bykaranteli.com/dashboard/watchlist>.
 
 ## Configuration
 
@@ -141,13 +161,15 @@ Server: MIT. Data: personal and research use with attribution "ByKaranteli (byka
 
 ## Plans and paid depth
 
-| Plan | Price | Rate | Monthly | Depth |
-|---|---|---|---|---|
-| Free API | $0 | 30 / min | 15,000 | public pages |
-| Terminal | $29 / mo | 60 / min | 150,000 | public pages |
-| Builder | $49 / mo | 300 / min | 1,000,000 fair use | member depth, 1,000 x402 catalog calls a month |
-| Business | $149 / mo | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, 10,000 x402 catalog calls a month, monthly bulk |
-| Scale | $399 / mo | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog with no ceiling, daily raw |
+| Plan | Rate | Monthly | Depth |
+|---|---|---|---|
+| Free API | 30 / min | 15,000 | public pages |
+| Terminal | 60 / min | 150,000 | public pages |
+| Builder | 300 / min | 1,000,000 fair use | member depth, x402 catalog included, each call counts as 10 requests of the monthly fair use |
+| Business | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, x402 catalog included, each call counts as 10 requests of the monthly fair use, monthly bulk |
+| Scale | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog included, each call counts as 10 requests of the monthly fair use, daily raw |
+
+Prices: https://bykaranteli.com/pricing
 
 A Free or Terminal key past its monthly figure gets 429 until
 the month resets. A paid key past its fair use is never stopped: it answers at
@@ -158,6 +180,5 @@ Full table: <https://bykaranteli.com/developers#tiers>. For recorded history and
 raw records beyond the live snapshots, bykaranteli.com also exposes pay-per-call
 x402 endpoints for anonymous agents (USDC on Solana or Base, priced per call,
 no account): <https://bykaranteli.com/developers#x402> · machine catalog:
-<https://bykaranteli.com/api/x402>. Builder keys call those routes unpaid up to
-1,000 calls a month, Business up to 10,000, Scale with no ceiling; past the
-allowance a key pays per call like an anonymous agent or moves up a plan.
+<https://bykaranteli.com/api/x402>. Builder, Business and Scale keys call those
+routes unpaid; each call counts as 10 requests of the monthly fair use.

@@ -8,6 +8,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod/v4";
 
+import { buildProvenance, pageForApiPath } from "./provenance.js";
+
 export type RegisterOptions = {
   /** Override the API origin used for OUTBOUND fetches (the hosted endpoint
    * points this at the container-internal origin). */
@@ -81,27 +83,14 @@ type ToolResult = {
 };
 
 /* Every answer carries where it came from and when (README promise; audit
- * P3 #416): routes that already emit these keep their own values. */
-/* API stems whose public page has a different name. Stripping /api/public off
- * the route gave nine tools a `source` that 404s on the site (2026-09-04
- * audit: /borrow-rates, /oi, /recent, /venues/markets ...). */
-const PAGE_FOR_STEM: Record<string, string> = {
-  "/borrow-rates": "/borrow",
-  "/oi": "/oi-leaderboard",
-  "/venues/markets": "/venues",
-  "/venues/lead-lag": "/venues",
-  "/venues/profile": "/venues",
-  "/venues/oi-history": "/venues",
-  "/options/surface": "/options",
-  "/context": "/methodology",
-  "/leverage-tiers": "/leverage",
-  "/datasets/etf-flows": "/etf",
-  "/datasets/liquidations-daily": "/liquidations",
-};
-
-function pageForApiPath(path: string): string {
-  const stem = path.replace(/^\/api\/(?:v1\/)?public/, "").split("?")[0] || "/";
-  return PAGE_FOR_STEM[stem] ?? stem;
+ * P3 #416): routes that already emit these keep their own values. Since
+ * 0.31.0 a provenance block rides along too (src/provenance.ts): source page,
+ * API path, the answer's own timestamp, fetch time, venues, full or sampled
+ * coverage, stale feeds, first recorded day and the proof page, each only
+ * when the answer carries it. The page map (stems whose page has another
+ * name) moved there as well. */
+function provenanceFor(data: unknown, path: string, page?: string) {
+  return buildProvenance(data, { apiPath: path, sourcePage: `${PUBLIC_URL}${page ?? pageForApiPath(path)}`, fetchedAt: new Date().toISOString() });
 }
 
 function withProvenance(data: unknown, path: string): unknown {
@@ -111,6 +100,7 @@ function withProvenance(data: unknown, path: string): unknown {
     ...record,
     generatedAt: typeof record.generatedAt === "string" ? record.generatedAt : new Date().toISOString(),
     source: typeof record.source === "string" ? record.source : `${PUBLIC_URL}${pageForApiPath(path)}`,
+    provenance: provenanceFor(record, path),
   };
 }
 
@@ -193,6 +183,7 @@ server.registerTool(
             }
           : undefined,
         source: `${PUBLIC_URL}/indices`,
+        provenance: provenanceFor(d, "/api/public/indices", "/indices"),
       });
     } catch (err) {
       return fail(err);
@@ -293,6 +284,7 @@ server.registerTool(
           ? `rows is capped at ${MAX_ROWS} of ${filtered.length} matching rows (largest first). Use summary.totals and summary.by_date for complete figures, or pass a symbol filter. ` + baseNote
           : baseNote,
         source: `${PUBLIC_URL}/liquidations`,
+        provenance: provenanceFor(d, "/api/v1/public/datasets/liquidations-daily.json", "/liquidations"),
       });
     } catch (err) {
       return fail(err);
@@ -338,6 +330,7 @@ server.registerTool(
         truncated: dates.length < new Set(filtered.map((r) => String(r.date))).size,
         note: "Finalized US trading days only; a positive net_inflow_usd means the funds bought more of the asset than they sold that day. window_net_inflow_usd sums the returned window per asset.",
         source: `${PUBLIC_URL}/etf`,
+        provenance: provenanceFor(d, "/api/v1/public/datasets/etf-flows.json", "/etf"),
       });
     } catch (err) {
       return fail(err);
@@ -374,9 +367,9 @@ server.registerTool(
             note: `${want} is not in the heatmap set. Tracked symbols: ${d.rows.map((r) => r.symbol).join(", ")}`,
           });
         }
-        return ok({ generatedAt: d.generatedAt, row, source: `${PUBLIC_URL}/heatmap` });
+        return ok({ generatedAt: d.generatedAt, row, source: `${PUBLIC_URL}/heatmap`, provenance: provenanceFor(d, "/api/public/heatmap") });
       }
-      return ok({ ...d, source: `${PUBLIC_URL}/heatmap` });
+      return ok({ ...d, source: `${PUBLIC_URL}/heatmap`, provenance: provenanceFor(d, "/api/public/heatmap") });
     } catch (err) {
       return fail(err);
     }
@@ -395,7 +388,7 @@ server.registerTool(
   async () => {
     try {
       const d = (await fetchJson("/api/public/funding-arb")) as Record<string, unknown>;
-      return ok({ ...d, source: `${PUBLIC_URL}/funding-arb` });
+      return ok({ ...d, source: `${PUBLIC_URL}/funding-arb`, provenance: provenanceFor(d, "/api/public/funding-arb") });
     } catch (err) {
       return fail(err);
     }
@@ -449,13 +442,14 @@ server.registerTool(
             note: `${want} is not in the tracked pressure universe right now.`,
           });
         }
-        return ok({ generatedAt: d.generatedAt, item: slim(item), source: `${PUBLIC_URL}/pressure` });
+        return ok({ generatedAt: d.generatedAt, item: slim(item), source: `${PUBLIC_URL}/pressure`, provenance: provenanceFor(d, "/api/public/pressure") });
       }
       return ok({
         generatedAt: d.generatedAt,
         items: d.items.slice(0, limit ?? 20).map(slim),
         totalTracked: d.items.length,
         source: `${PUBLIC_URL}/pressure`,
+        provenance: provenanceFor(d, "/api/public/pressure"),
       });
     } catch (err) {
       return fail(err);
@@ -475,7 +469,7 @@ server.registerTool(
   async () => {
     try {
       const d = (await fetchJson("/api/public/top-movers")) as Record<string, unknown>;
-      return ok({ ...d, source: `${PUBLIC_URL}/top-movers` });
+      return ok({ ...d, source: `${PUBLIC_URL}/top-movers`, provenance: provenanceFor(d, "/api/public/top-movers") });
     } catch (err) {
       return fail(err);
     }
@@ -1144,7 +1138,8 @@ server.registerTool(
       const sym = raw.endsWith("USDT") ? raw : `${raw}USDT`;
       const path = `/api/liqmap/public?symbol=${encodeURIComponent(sym)}&timeframe=${encodeURIComponent(timeframe ?? "24h")}`;
       const data = await fetchJson(path);
-      return ok({ ...(data as Record<string, unknown>), source: `${PUBLIC_URL}/liqmap/${sym.replace(/USDT$/, "").toLowerCase()}` });
+      const page = `/liqmap/${sym.replace(/USDT$/, "").toLowerCase()}`;
+      return ok({ ...(data as Record<string, unknown>), source: `${PUBLIC_URL}${page}`, provenance: provenanceFor(data, path, page) });
     } catch (err) {
       return fail(err);
     }
@@ -1468,5 +1463,298 @@ server.registerTool(
     }
   },
 );
+
+/* API contract values the account and series tools use (0.31.0). They mirror the web registries (series metrics,
+ * recipe fields, operators, channels and limits); the web test mcp-extra-tools.test.ts fails when they drift, and
+ * GET /api/series/metrics lists the metrics with their units and floors at runtime. */
+const SERIES_METRIC_KEYS = ["price", "volume", "cvd_perp", "cvd_spot", "oi", "funding", "liquidations", "long_short", "top_traders", "rsi", "premium", "etf_flow", "borrow", "whale_net"];
+const SERIES_METRICS: Record<string, true> = Object.fromEntries(SERIES_METRIC_KEYS.map((k) => [k, true]));
+const SERIES_PERIODS = ["5m", "15m", "1h", "4h", "1d"] as const;
+type SeriesPeriod = (typeof SERIES_PERIODS)[number];
+const PERIOD_MS: Record<SeriesPeriod, number> = { "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000 };
+const SERIES_MEMBER_BAR_LIMIT = 5000;
+const RECIPE_FIELD_KEYS = ["mark_price", "pressure_score", "funding_rate_pct", "oi24h_pct", "basis_pct", "price_change_24h_pct", "liq_cluster_distance_pct", "usdt_peg_min_usd", "usdc_peg_min_usd", "liq_1h_usd", "rsi_4h", "ls_ratio_global", "book_imbalance_2pct_pct", "withdrawal_paused_venues", "max_leverage_min", "borrow_apr_pct", "hl_whale_long_share_pct"] as const;
+const RECIPE_OPS: string[] = [">=", ">", "<=", "<", "=="];
+const RECIPE_CHANNELS = ["telegram", "email", "push", "webhook"] as const;
+const RECIPE_LIMITS = { MAX_CONDITIONS: 6, MAX_SYMBOLS: 20, NAME_MAX: 64 } as const;
+const ALERT_TEXT_MAX_CHARS = 500;
+
+/* GET a market route with provenance, and extra fields the tool adds (get_series' requested window). */
+async function tool(path: string, extra?: Record<string, unknown>): Promise<ToolResult> {
+  try {
+    const data = withProvenance(await fetchJson(path), path);
+    return ok(extra && data && typeof data === "object" && !Array.isArray(data) ? { ...(data as Record<string, unknown>), ...extra } : data);
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/* Account tools (0.31.0): they read and change the caller's own alert recipes and watchlists through the member
+ * routes, which take the account key (the key's refusals, the plan's rate and monthly quota, a per-key write cap and
+ * an audit row per write are enforced there). Annotations tell the client which tools change something; the market
+ * data tools stay read-only and open-world. The hosted endpoint carries the same tools in
+ * web/src/lib/mcp-extra-tools.ts until it installs this version; the web test mcp-extra-tools.test.ts compares the
+ * two definitions (names, titles, descriptions, input schemas, annotations). */
+type Annotations = { readOnlyHint: boolean; openWorldHint: boolean; destructiveHint?: boolean; idempotentHint?: boolean };
+const ACCOUNT_READ: Annotations = { readOnlyHint: true, openWorldHint: false };
+const ACCOUNT_WRITE: Annotations = { readOnlyHint: false, openWorldHint: false, destructiveHint: false, idempotentHint: false };
+const ACCOUNT_WRITE_IDEMPOTENT: Annotations = { readOnlyHint: false, openWorldHint: false, destructiveHint: false, idempotentHint: true };
+const ACCOUNT_DELETE: Annotations = { readOnlyHint: false, openWorldHint: false, destructiveHint: true, idempotentHint: true };
+
+const errorResult = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
+const okResult = (data: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(data) }] });
+const KEY_NEEDED = "This tool reads or changes your own account, so it needs your account key (x-api-key: bk_... or Authorization: Bearer bk_...). Free key: https://bykaranteli.com/dashboard/api";
+
+/* One call to a member route with the caller's key. The route's own error (limit reached, unknown id, rate) is passed
+ * through as the tool error so the model can say what happened. */
+async function account(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; result: ToolResult }> {
+  const authorization = authorizationFor();
+  if (!authorization) return { ok: false, result: errorResult(KEY_NEEDED) };
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers: {
+        accept: "application/json",
+        "user-agent": USER_AGENT,
+        authorization,
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const text = await res.text();
+    let data: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) data = parsed as Record<string, unknown>;
+    } catch {
+      // non-JSON body: the status line below still says what happened
+    }
+    if (!res.ok) {
+      const reason = typeof data.message === "string" ? data.message : typeof data.error === "string" ? data.error : text.replace(/\s+/g, " ").slice(0, 300);
+      return { ok: false, result: errorResult(`${method} ${path.split("?")[0]} returned HTTP ${res.status}: ${reason}`) };
+    }
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, result: errorResult(`Failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function seriesSymbol(raw: unknown): string | null {
+  const s = (typeof raw === "string" && raw.trim() ? raw : "BTCUSDT").trim().toUpperCase().replace(/[\s/_-]+/g, "");
+  const expanded = s.endsWith("USDT") ? s : `${s}USDT`;
+  return /^[A-Z0-9]{5,20}$/.test(expanded) ? expanded : null;
+}
+
+type WatchlistRow = { id: string; name: string; itemCount?: number };
+/* The list a symbol goes to: the one named, else "default", else the only list the account has. */
+async function resolveWatchlist(watchlistId: unknown): Promise<{ ok: true; list: WatchlistRow } | { ok: false; result: ToolResult }> {
+  const lists = await account("GET", "/api/member/watchlists");
+  if (!lists.ok) return lists;
+  const rows = (Array.isArray(lists.data.watchlists) ? lists.data.watchlists : []) as WatchlistRow[];
+  if (typeof watchlistId === "string" && watchlistId.trim()) {
+    const hit = rows.find((w) => w.id === watchlistId.trim());
+    return hit ? { ok: true, list: hit } : { ok: false, result: errorResult(`No watchlist with id ${watchlistId.trim()} on this account. Lists: ${rows.map((w) => `${w.name} (${w.id})`).join(", ") || "none"}.`) };
+  }
+  const pick = rows.find((w) => w.name === "default") ?? (rows.length === 1 ? rows[0] : undefined);
+  if (pick) return { ok: true, list: pick };
+  return {
+    ok: false,
+    result: errorResult(rows.length === 0
+      ? "This account has no watchlist yet. Open https://bykaranteli.com/dashboard/watchlist once to create the default list, then call again."
+      : `Pass watchlist_id: this account has ${rows.length} lists: ${rows.map((w) => `${w.name} (${w.id})`).join(", ")}.`),
+  };
+}
+
+/* ---- 0.31.0: recorded series, alert text, alert recipes, watchlists ---- */
+
+server.registerTool("get_series", {
+  title: "Recorded series: bars or points of one metric for one perpetual (price, OI, funding, CVD, liquidations, long/short, RSI and more)",
+  description: `Call this when the user wants the history of one recorded metric for one perpetual as a time series: price candles, volume, perp or spot CVD, open interest, funding, liquidations, long/short ratios, RSI, the Coinbase premium, US spot ETF flows, borrow rates or Hyperliquid whale net flow, for charting, backtesting or "what did X do over the last N days". Returns the /api/series answer (points as [t, v], or [t, o, h, l, c, v] for price, with unit, kind, source and source_kind, the bars served and whether member depth applied) plus provenance. metric is one of: ${SERIES_METRIC_KEYS.join(", ")} (unit, finest period and venue support of each: https://bykaranteli.com/api/series/metrics). Public depth serves fewer bars and no 5m bars; a Builder key and above get member depth; the bar limits are in the same list. Pass from and to (ISO) for a window, or limit for the newest bars.`,
+  inputSchema: {
+    metric: z.string().describe("string, metric key, e.g. price, oi, funding, liquidations (list: /api/series/metrics)"),
+    symbol: z.string().optional().describe("string, optional Binance USDT-M perp or coin, e.g. BTCUSDT or BTC (default BTCUSDT)"),
+    period: z.enum(SERIES_PERIODS).optional().describe(`string, optional bar period: ${SERIES_PERIODS.join(" | ")} (default 1h; each metric has a finest period)`),
+    venue: z.string().optional().describe("string, optional venue id for price, oi, funding or borrow, e.g. okx (default binance)"),
+    from: z.string().optional().describe("string, optional ISO start, e.g. 2026-09-01T00:00:00Z"),
+    to: z.string().optional().describe("string, optional ISO end (default now)"),
+    limit: z.number().optional().describe(`number, optional newest bars, 10..${SERIES_MEMBER_BAR_LIMIT}; the key's depth caps it`),
+  },
+  annotations: READ_ONLY,
+}, async (args: Record<string, unknown> = {}) => {
+  const metric = typeof args.metric === "string" ? args.metric.trim().toLowerCase() : "";
+  if (!Object.hasOwn(SERIES_METRICS, metric)) return errorResult(`Invalid input: metric must be one of ${SERIES_METRIC_KEYS.join(", ")}.`);
+  const symbol = seriesSymbol(args.symbol);
+  if (!symbol) return errorResult("Invalid input: symbol looks like BTCUSDT or BTC.");
+  const period = (typeof args.period === "string" && (SERIES_PERIODS as readonly string[]).includes(args.period) ? args.period : "1h") as SeriesPeriod;
+  const to = typeof args.to === "string" && args.to.trim() ? new Date(args.to) : null;
+  const from = typeof args.from === "string" && args.from.trim() ? new Date(args.from) : null;
+  if ((to && Number.isNaN(to.getTime())) || (from && Number.isNaN(from.getTime()))) return errorResult("Invalid input: from and to are ISO dates, e.g. 2026-09-01T00:00:00Z.");
+  const end = to ?? new Date();
+  if (from && from.getTime() >= end.getTime()) return errorResult("Invalid input: from must be before to.");
+  let limit = typeof args.limit === "number" && Number.isFinite(args.limit) && args.limit > 0 ? Math.floor(args.limit) : undefined;
+  const bars = from ? Math.ceil((end.getTime() - from.getTime()) / PERIOD_MS[period]) : undefined;
+  if (bars !== undefined) limit = Math.min(limit ?? bars, bars);
+  if (limit !== undefined) limit = Math.max(10, Math.min(SERIES_MEMBER_BAR_LIMIT, limit));
+  const q = new URLSearchParams({ metric, symbol, period });
+  if (limit !== undefined) q.set("limit", String(limit));
+  if (to) q.set("to", to.toISOString());
+  if (typeof args.venue === "string" && /^[a-z0-9]{2,20}$/i.test(args.venue.trim())) q.set("venue", args.venue.trim().toLowerCase());
+  /* The route answers the newest `limit` bars up to `to`; `requested` lets the caller compare with the bars served. */
+  return tool(`/api/series?${q.toString()}`, from ? { requested: { from: from.toISOString(), to: end.toISOString(), bars } } : undefined);
+});
+
+server.registerTool("parse_alert_text", {
+  title: "Alert text to an alert recipe: turn a sentence like \"BTC funding above 0.05%\" into the recipe it describes",
+  description: `Call this when the user describes an alert in words ("tell me when ETH drops 5% in a day", "BTC funding above 5 bps", "liquidations over $20M in an hour") and you want the exact recipe before creating it. Rule based, nothing is saved: returns recipe (name, scope, symbols, conditions of field, op, value, cooldownHours, channels) or null, confidence 0..1, a one-line summary to confirm with the user, and unresolved (what the text left open or what was assumed; timing words are not part of a recipe). A threshold the text does not state is never invented. English and tickers; at most ${ALERT_TEXT_MAX_CHARS} characters. Pass the returned conditions, scope, symbols and channels to create_alert_recipe once the user agrees.`,
+  inputSchema: {
+    text: z.string().describe("string, the alert in plain English, e.g. \"SOL funding below -0.01% or OI up 10%\""),
+  },
+  annotations: ACCOUNT_READ,
+}, async (args: Record<string, unknown> = {}) => {
+  const text = typeof args.text === "string" ? args.text.trim() : "";
+  if (!text) return errorResult("Invalid input: text is required, e.g. \"BTC funding above 0.05%\".");
+  if (text.length > ALERT_TEXT_MAX_CHARS) return errorResult(`Invalid input: at most ${ALERT_TEXT_MAX_CHARS} characters.`);
+  const r = await account("POST", "/api/member/alert-recipes/parse", { text });
+  return r.ok ? okResult(r.data) : r.result;
+});
+
+server.registerTool("list_alert_recipes", {
+  title: "Your alert recipes: every alert on your account with its conditions, scope, channels and when it last fired",
+  description: "Call this when the user asks which alerts they have, whether an alert fired, or before deleting or changing one. Returns the account's alert recipes (id, name, scope, symbols, conditions, cooldown in hours, enabled, last fired, fire count, channels). Needs the account key; reads nothing but this account.",
+  inputSchema: {},
+  annotations: ACCOUNT_READ,
+}, async () => {
+  const r = await account("GET", "/api/member/alert-recipes");
+  return r.ok ? okResult({ ...r.data, page: "https://bykaranteli.com/dashboard/alerts" }) : r.result;
+});
+
+server.registerTool("create_alert_recipe", {
+  title: "Create an alert recipe (writes to your account)",
+  description: `Call this when the user asks to be alerted when a metric crosses a threshold and has agreed to the exact condition (parse_alert_text turns their words into one). Saves an alert recipe on the account: it fires when every condition holds, delivers by Telegram first with email as fallback unless channels says otherwise, and waits cooldown_hours before it fires again for the same symbol. field is one of: ${RECIPE_FIELD_KEYS.join(", ")}; op is one of ${RECIPE_OPS.join(" ")}; percent fields take percent values (0.05 means 0.05%). Pass field, op and threshold for one condition, or conditions for up to ${RECIPE_LIMITS.MAX_CONDITIONS}. scope: watchlist (default), any, or symbols with symbols. The plan sets how many recipes an account keeps; past it the tool answers with the limit. Writes are rate limited per key and each one is recorded on the account.`,
+  inputSchema: {
+    field: z.string().optional().describe("string, one condition's metric, e.g. funding_rate_pct"),
+    op: z.enum(RECIPE_OPS as [string, ...string[]]).optional().describe(`string, one condition's comparison: ${RECIPE_OPS.join(" | ")}`),
+    threshold: z.number().optional().describe("number, one condition's threshold, e.g. 0.05"),
+    conditions: z.array(z.object({ field: z.string(), op: z.enum(RECIPE_OPS as [string, ...string[]]), value: z.number() })).optional().describe(`array, optional up to ${RECIPE_LIMITS.MAX_CONDITIONS} conditions {field, op, value}, all must hold (instead of field, op, threshold)`),
+    scope: z.enum(["watchlist", "any", "symbols"]).optional().describe("string, optional: watchlist (default), any, symbols"),
+    symbols: z.array(z.string()).optional().describe(`array, optional up to ${RECIPE_LIMITS.MAX_SYMBOLS} symbols, e.g. [\"BTCUSDT\", \"ETH\"]; implies scope symbols`),
+    channels: z.array(z.enum(RECIPE_CHANNELS)).optional().describe(`array, optional delivery channels: ${RECIPE_CHANNELS.join(" | ")}; empty means Telegram first, email as fallback`),
+    cooldown_hours: z.number().optional().describe("number, optional 1..168 hours before it fires again (default 24)"),
+    name: z.string().optional().describe("string, optional name; default describes the condition"),
+  },
+  annotations: ACCOUNT_WRITE,
+}, async (args: Record<string, unknown> = {}) => {
+  const rawConds = Array.isArray(args.conditions) && args.conditions.length > 0
+    ? args.conditions
+    : args.field !== undefined || args.threshold !== undefined
+      ? [{ field: args.field, op: args.op, value: args.threshold }]
+      : [];
+  if (rawConds.length === 0) return errorResult("Invalid input: pass field, op and threshold, or conditions.");
+  if (rawConds.length > RECIPE_LIMITS.MAX_CONDITIONS) return errorResult(`Invalid input: at most ${RECIPE_LIMITS.MAX_CONDITIONS} conditions.`);
+  const conditions: Array<{ field: string; op: string; value: number }> = [];
+  for (const c of rawConds as Array<Record<string, unknown>>) {
+    const field = typeof c?.field === "string" ? c.field.trim() : "";
+    const op = typeof c?.op === "string" ? c.op.trim() : "";
+    const value = typeof c?.value === "number" ? c.value : Number.NaN;
+    if (!RECIPE_FIELD_KEYS.includes(field as (typeof RECIPE_FIELD_KEYS)[number])) return errorResult(`Invalid input: field "${field}" is not one of ${RECIPE_FIELD_KEYS.join(", ")}.`);
+    if (!(RECIPE_OPS as readonly string[]).includes(op)) return errorResult(`Invalid input: op must be one of ${RECIPE_OPS.join(" ")}.`);
+    if (!Number.isFinite(value)) return errorResult(`Invalid input: the threshold of ${field} must be a number.`);
+    conditions.push({ field, op, value });
+  }
+  const symbolsIn = Array.isArray(args.symbols) ? args.symbols : [];
+  if (symbolsIn.length > RECIPE_LIMITS.MAX_SYMBOLS) return errorResult(`Invalid input: at most ${RECIPE_LIMITS.MAX_SYMBOLS} symbols.`);
+  const symbols: string[] = [];
+  for (const raw of symbolsIn) {
+    const sym = seriesSymbol(raw);
+    if (!sym || typeof raw !== "string") return errorResult(`Invalid input: "${String(raw)}" is not a symbol like BTCUSDT or BTC.`);
+    if (!symbols.includes(sym)) symbols.push(sym);
+  }
+  const scope = args.scope === "any" || args.scope === "watchlist" || args.scope === "symbols" ? args.scope : symbols.length > 0 ? "symbols" : "watchlist";
+  if (scope === "symbols" && symbols.length === 0) return errorResult("Invalid input: scope symbols needs symbols.");
+  const channels = Array.isArray(args.channels) ? args.channels.filter((c): c is string => typeof c === "string") : [];
+  if (channels.some((c) => !(RECIPE_CHANNELS as readonly string[]).includes(c))) return errorResult(`Invalid input: channels are ${RECIPE_CHANNELS.join(", ")}.`);
+  const cooldownHours = typeof args.cooldown_hours === "number" && Number.isFinite(args.cooldown_hours) ? Math.max(1, Math.min(168, Math.round(args.cooldown_hours))) : 24;
+  const fallbackName = `${scope === "symbols" ? `${symbols.slice(0, 3).map((x) => x.replace(/USDT$/, "")).join(", ")} · ` : ""}${conditions.map((c) => `${c.field} ${c.op} ${c.value}`).join(" and ")}`;
+  const name = (typeof args.name === "string" && args.name.trim() ? args.name.trim() : fallbackName).slice(0, RECIPE_LIMITS.NAME_MAX);
+  const body = { name, scope, symbols: scope === "symbols" ? symbols : [], conditions, cooldownHours, channels: [...new Set(channels)], enabled: true };
+  const r = await account("POST", "/api/member/alert-recipes", body);
+  return r.ok ? okResult({ ok: true, id: r.data.id, recipe: body, page: "https://bykaranteli.com/dashboard/alerts" }) : r.result;
+});
+
+server.registerTool("delete_alert_recipe", {
+  title: "Delete one of your alert recipes (writes to your account)",
+  description: "Call this when the user asks to remove an alert. Deletes the alert recipe with this id from the account (list_alert_recipes shows the ids); an id that is not one of the account's recipes changes nothing and says so. Writes are rate limited per key and each one is recorded on the account.",
+  inputSchema: {
+    id: z.string().describe("string, the recipe id from list_alert_recipes"),
+  },
+  annotations: ACCOUNT_DELETE,
+}, async (args: Record<string, unknown> = {}) => {
+  const id = typeof args.id === "string" ? args.id.trim() : "";
+  if (!UUID_RE.test(id)) return errorResult("Invalid input: id is a recipe id from list_alert_recipes.");
+  const r = await account("DELETE", `/api/member/alert-recipes/${id}`);
+  if (!r.ok) return r.result;
+  if (r.data.deleted === 0) return errorResult(`No alert recipe with id ${id} on this account; list_alert_recipes shows the ids.`);
+  return okResult({ ok: true, id, deleted: true });
+});
+
+server.registerTool("list_watchlists", {
+  title: "Your watchlists and the symbols on each",
+  description: "Call this when the user asks what is on their watchlist, which lists they have, or before adding or removing a symbol. Returns the account's watchlists (id, name, symbol count) and, unless include_symbols is false, the symbols on each list in order. Needs the account key; reads nothing but this account.",
+  inputSchema: {
+    include_symbols: z.boolean().optional().describe("boolean, optional: include each list's symbols (default true)"),
+  },
+  annotations: ACCOUNT_READ,
+}, async (args: Record<string, unknown> = {}) => {
+  const lists = await account("GET", "/api/member/watchlists");
+  if (!lists.ok) return lists.result;
+  const rows = (Array.isArray(lists.data.watchlists) ? lists.data.watchlists : []) as WatchlistRow[];
+  if (args.include_symbols === false) return okResult({ watchlists: rows, page: "https://bykaranteli.com/dashboard/watchlist" });
+  const out: Array<WatchlistRow & { symbols?: string[] }> = [];
+  for (const w of rows.slice(0, 20)) {
+    const items = await account("GET", `/api/member/watchlists/${encodeURIComponent(w.id)}/items`);
+    if (!items.ok) return items.result;
+    out.push({ ...w, symbols: Array.isArray(items.data.symbols) ? (items.data.symbols as string[]) : [] });
+  }
+  return okResult({ watchlists: out, page: "https://bykaranteli.com/dashboard/watchlist" });
+});
+
+server.registerTool("add_watchlist_symbol", {
+  title: "Add a symbol to your watchlist (writes to your account)",
+  description: "Call this when the user asks to watch, follow or add a coin to their watchlist. Adds the symbol to the list named by watchlist_id, else to the default list (or the only list the account has); a symbol already on the list stays once. Returns the list's symbols after the change. Writes are rate limited per key and each one is recorded on the account.",
+  inputSchema: {
+    symbol: z.string().describe("string, a Binance USDT-M perp or coin, e.g. SOLUSDT or SOL"),
+    watchlist_id: z.string().optional().describe("string, optional list id from list_watchlists (default: the default list)"),
+  },
+  annotations: ACCOUNT_WRITE_IDEMPOTENT,
+}, async (args: Record<string, unknown> = {}) => {
+  const symbol = typeof args.symbol === "string" ? args.symbol.trim() : "";
+  if (!symbol || symbol.length > 30) return errorResult("Invalid input: symbol looks like SOLUSDT or SOL.");
+  const list = await resolveWatchlist(args.watchlist_id);
+  if (!list.ok) return list.result;
+  const r = await account("POST", `/api/member/watchlists/${encodeURIComponent(list.list.id)}/items`, { symbol });
+  if (!r.ok) return r.result;
+  return okResult({ ...r.data, watchlist: { id: list.list.id, name: list.list.name }, note: r.data.created === false ? "Already on this list." : undefined });
+});
+
+server.registerTool("remove_watchlist_symbol", {
+  title: "Remove a symbol from your watchlist (writes to your account)",
+  description: "Call this when the user asks to stop watching a coin or remove it from their watchlist. Removes the symbol from the list named by watchlist_id, else from the default list (or the only list the account has); a symbol that is not on the list changes nothing. Returns the list's symbols after the change. Writes are rate limited per key and each one is recorded on the account.",
+  inputSchema: {
+    symbol: z.string().describe("string, the symbol to remove, e.g. SOLUSDT or SOL"),
+    watchlist_id: z.string().optional().describe("string, optional list id from list_watchlists (default: the default list)"),
+  },
+  annotations: ACCOUNT_DELETE,
+}, async (args: Record<string, unknown> = {}) => {
+  const symbol = typeof args.symbol === "string" ? args.symbol.trim() : "";
+  if (!symbol || symbol.length > 30) return errorResult("Invalid input: symbol looks like SOLUSDT or SOL.");
+  const list = await resolveWatchlist(args.watchlist_id);
+  if (!list.ok) return list.result;
+  const r = await account("DELETE", `/api/member/watchlists/${encodeURIComponent(list.list.id)}/items?symbol=${encodeURIComponent(symbol)}`);
+  if (!r.ok) return r.result;
+  return okResult({ ...r.data, watchlist: { id: list.list.id, name: list.list.name }, note: r.data.deleted === false ? "Was not on this list." : undefined });
+});
 
 }

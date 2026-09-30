@@ -58,10 +58,24 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 52, names.join(","));
+check("tools/list count", names.length === 60, names.join(","));
+/* 0.31.0: the account tools act on the caller's own account. The four writes are never called here; the account reads
+ * run only with a key (BYKARANTELI_API_KEY), since without one they answer with the key steps by design. */
+const WRITE_TOOLS = new Set(["create_alert_recipe", "delete_alert_recipe", "add_watchlist_symbol", "remove_watchlist_symbol"]);
+const ACCOUNT_READ_TOOLS = new Set(["list_alert_recipes", "list_watchlists", "parse_alert_text"]);
+const HAS_KEY = Boolean((process.env.BYKARANTELI_API_KEY ?? "").trim());
+const tools = list.result?.tools ?? [];
 check(
-  "all tools annotated read-only",
-  (list.result?.tools ?? []).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
+  "market tools annotated read-only and open-world",
+  tools.filter((t) => !WRITE_TOOLS.has(t.name) && !ACCOUNT_READ_TOOLS.has(t.name)).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
+  "",
+);
+check("account reads annotated read-only", tools.filter((t) => ACCOUNT_READ_TOOLS.has(t.name)).every((t) => t.annotations?.readOnlyHint === true), "");
+check(
+  "write tools annotated as writes, removals destructive",
+  tools.filter((t) => WRITE_TOOLS.has(t.name)).length === WRITE_TOOLS.size &&
+    tools.filter((t) => WRITE_TOOLS.has(t.name)).every((t) => t.annotations?.readOnlyHint === false && t.title.endsWith("(writes to your account)")) &&
+    ["delete_alert_recipe", "remove_watchlist_symbol"].every((n) => tools.find((t) => t.name === n)?.annotations?.destructiveHint === true),
   "",
 );
 
@@ -70,8 +84,15 @@ check(
  * before the targeted assertions so their deeper checks still apply. */
 const REQUIRED_ARGS = {
   get_metric_context: { metric: "fear_greed" },
+  get_series: { metric: "oi", symbol: "BTC", period: "1h", limit: 24 },
+  parse_alert_text: { text: "BTC funding above 0.05%" },
 };
 for (const toolName of names) {
+  if (WRITE_TOOLS.has(toolName)) continue;
+  if (ACCOUNT_READ_TOOLS.has(toolName) && !HAS_KEY) {
+    console.log(`SKIP call ${toolName} · no BYKARANTELI_API_KEY`);
+    continue;
+  }
   const r = await callAll(toolName, REQUIRED_ARGS[toolName] ?? {});
   check(`call ${toolName}`, !r.isError, r.isError ? r.text.slice(0, 100).replace(/\n/g, " ") : "");
 }
@@ -93,6 +114,7 @@ check(
   !indices.isError && indices.text.includes("fearGreed") && indices.text.includes("generatedAt"),
   indices.text.slice(0, 80).replace(/\n/g, " "),
 );
+check("provenance on a market answer", !indices.isError && indices.text.includes('"provenance":{"source_page"'), "");
 
 const liq = await call("get_liquidations", { symbol: "BTCUSDT", days: 3 });
 check(
