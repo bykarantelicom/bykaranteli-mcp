@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.32.0] - 2026-10-06
+
+67 tools.
+
+### Changed
+
+- `get_etf_flows`: `asset` accepts `XRP` next to `BTC`, `ETH` and `SOL` and returns the US spot XRP ETF daily rows (net inflow, total net assets, cumulative inflow since launch, value traded, in USD). The description gives each asset's first day (BTC and ETH since 2025-05-20, SOL since 2025-10-28, XRP since 2026-09-08) instead of one history length for all.
+
 ## [0.31.0] - 2026-09-30
 
 67 tools.
