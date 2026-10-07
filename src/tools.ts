@@ -1575,7 +1575,7 @@ server.registerTool(
 /* API contract values the account and series tools use (0.31.0). They mirror the web registries (series metrics,
  * recipe fields, operators, channels and limits); the web test mcp-extra-tools.test.ts fails when they drift, and
  * GET /api/series/metrics lists the metrics with their units and floors at runtime. */
-const SERIES_METRIC_KEYS = ["price", "volume", "cvd_perp", "cvd_spot", "oi", "funding", "liquidations", "long_short", "top_traders", "rsi", "premium", "etf_flow", "borrow", "whale_net"];
+const SERIES_METRIC_KEYS = ["price", "volume", "cvd_perp", "cvd_spot", "oi", "funding", "funding_agg", "liquidations", "long_short", "top_traders", "rsi", "premium", "etf_flow", "borrow", "whale_net"];
 const SERIES_METRICS: Record<string, true> = Object.fromEntries(SERIES_METRIC_KEYS.map((k) => [k, true]));
 const SERIES_PERIODS = ["5m", "15m", "1h", "4h", "1d"] as const;
 type SeriesPeriod = (typeof SERIES_PERIODS)[number];
@@ -1680,7 +1680,7 @@ async function resolveWatchlist(watchlistId: unknown): Promise<{ ok: true; list:
 
 server.registerTool("get_series", {
   title: "Recorded series: bars or points of one metric for one perpetual (price, OI, funding, CVD, liquidations, long/short, RSI and more)",
-  description: `Call this when the user wants the history of one recorded metric for one perpetual as a time series: price candles, volume, perp or spot CVD, open interest, funding, liquidations, long/short ratios, RSI, the Coinbase premium, US spot ETF flows, borrow rates or Hyperliquid whale net flow, for charting, backtesting or "what did X do over the last N days". Returns the /api/series answer (points as [t, v], or [t, o, h, l, c, v] for price, with unit, kind, source and source_kind, the bars served and whether member depth applied) plus provenance. metric is one of: ${SERIES_METRIC_KEYS.join(", ")} (unit, finest period and venue support of each: https://bykaranteli.com/api/series/metrics). Public depth serves fewer bars and no 5m bars; a Builder key and above get member depth; the bar limits are in the same list. Pass from and to (ISO) for a window, or limit for the newest bars.`,
+  description: `Call this when the user wants the history of one recorded metric for one perpetual as a time series: price candles, volume, perp or spot CVD, open interest, funding (one venue, or OI-weighted across every venue as funding_agg), liquidations, long/short ratios, RSI, the Coinbase premium, US spot ETF flows, borrow rates or Hyperliquid whale net flow, for charting, backtesting or "what did X do over the last N days". Returns the /api/series answer (points as [t, v], or [t, o, h, l, c, v] for price, with unit, kind, source and source_kind, the bars served and whether member depth applied) plus provenance. metric is one of: ${SERIES_METRIC_KEYS.join(", ")} (unit, finest period and venue support of each: https://bykaranteli.com/api/series/metrics). Public depth serves fewer bars and no 5m bars; a Builder key and above get member depth; the bar limits are in the same list. Pass from and to (ISO) for a window, or limit for the newest bars.`,
   inputSchema: {
     metric: z.string().describe("string, metric key, e.g. price, oi, funding, liquidations (list: /api/series/metrics)"),
     symbol: z.string().optional().describe("string, optional Binance USDT-M perp or coin, e.g. BTCUSDT or BTC (default BTCUSDT)"),

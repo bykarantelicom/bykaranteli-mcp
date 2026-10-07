@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.34.0] - 2026-10-07
+
+67 tools.
+
+### Changed
+
+- `get_series`: `metric` accepts `funding_agg`, the 8h funding rate weighted by open interest across every perp venue the 10-minute venue recorder reports (the SuperChart's all-venue funding pane); the description names it next to the single-venue `funding`.
+
 ## [0.33.0] - 2026-10-07
 
 67 tools.
