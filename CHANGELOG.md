@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.34.1] - 2026-10-07
+
+67 tools.
+
+### Changed
+
+- `get_series`: `period` accepts the sixteen bar periods the API serves since 2026-10-07 (1m, 3m, 5m, 10m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M); the package listed five. Periods under 15m stay member depth on a key.
+
 ## [0.34.0] - 2026-10-07
 
 67 tools.

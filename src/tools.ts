@@ -1577,9 +1577,9 @@ server.registerTool(
  * GET /api/series/metrics lists the metrics with their units and floors at runtime. */
 const SERIES_METRIC_KEYS = ["price", "volume", "cvd_perp", "cvd_spot", "oi", "funding", "funding_agg", "liquidations", "long_short", "top_traders", "rsi", "premium", "etf_flow", "borrow", "whale_net"];
 const SERIES_METRICS: Record<string, true> = Object.fromEntries(SERIES_METRIC_KEYS.map((k) => [k, true]));
-const SERIES_PERIODS = ["5m", "15m", "1h", "4h", "1d"] as const;
+const SERIES_PERIODS = ["1m", "3m", "5m", "10m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"] as const;
 type SeriesPeriod = (typeof SERIES_PERIODS)[number];
-const PERIOD_MS: Record<SeriesPeriod, number> = { "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000 };
+const PERIOD_MS: Record<SeriesPeriod, number> = { "1m": 60_000, "3m": 180_000, "5m": 300_000, "10m": 600_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000, "6h": 21_600_000, "8h": 28_800_000, "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000, "1w": 604_800_000, "1M": 2_592_000_000 };
 const SERIES_MEMBER_BAR_LIMIT = 5000;
 const RECIPE_FIELD_KEYS = ["mark_price", "pressure_score", "funding_rate_pct", "oi24h_pct", "basis_pct", "price_change_24h_pct", "liq_cluster_distance_pct", "usdt_peg_min_usd", "usdc_peg_min_usd", "liq_1h_usd", "rsi_4h", "ls_ratio_global", "book_imbalance_2pct_pct", "withdrawal_paused_venues", "max_leverage_min", "borrow_apr_pct", "hl_whale_long_share_pct"] as const;
 const RECIPE_OPS: string[] = [">=", ">", "<=", "<", "=="];
