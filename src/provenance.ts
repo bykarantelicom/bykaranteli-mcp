@@ -12,6 +12,10 @@ export type ProvenanceCoverage = "full" | "sampled" | "mixed";
 
 export type Provenance = {
   source_page: string;
+  /** The SuperChart address that opens on what this answer holds, when the route has a chart twin (2026-10-07). */
+  chart_url?: string;
+  /** A PNG of that chart view (1200 x 630, candles, heatmap, prints), for clients that show images. */
+  chart_image_url?: string;
   api_path: string;
   /** The answer's own timestamp (generatedAt, generated_at, as_of); null when the route does not stamp one. */
   generated_at: string | null;
@@ -68,6 +72,37 @@ function venueId(item: unknown): string | undefined {
   if (!isRec(item)) return undefined;
   const id = str(item.exchange) ?? str(item.venue_id) ?? str(item.id) ?? str(item.key) ?? str(item.venue);
   return id && VENUE_TOKEN.test(id) ? id : undefined;
+}
+
+/* Chart block phase 2 (2026-10-07): the SuperChart address that shows what an answer holds, so an agent can hand the
+ * reader a chart that opens on the same symbol, period and layers (chart-url-state.ts keys: s, p, panes, heat, pr,
+ * lv). Null for routes with no chart twin. The symbol defaults to BTCUSDT when the query names none. */
+const CHART_BASE = "https://bykaranteli.com/chart";
+function chartSymbol(q: URLSearchParams): string {
+  const raw = (q.get("symbol") ?? q.get("coin") ?? q.get("currency") ?? q.get("asset") ?? "BTC").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!raw) return "BTCUSDT";
+  return /USDT$|USD$|PERP$/.test(raw) ? raw : `${raw}USDT`;
+}
+export function chartUrlForApiPath(path: string): string | null {
+  const [clean, query = ""] = path.split("?");
+  const q = new URLSearchParams(query);
+  const s = chartSymbol(q);
+  if (clean === "/api/series" || clean.startsWith("/api/series/")) {
+    const metric = (q.get("metric") ?? "price").toLowerCase();
+    const period = q.get("period") ?? "1h";
+    const panes = metric === "price" || metric === "volume" ? "" : `&panes=${encodeURIComponent(metric)}`;
+    return `${CHART_BASE}?s=${s}&p=${encodeURIComponent(period)}${panes}&heat=1&pr=1`;
+  }
+  if (clean.startsWith("/api/liqmap/") || clean.startsWith("/api/public/liqmap") || clean.startsWith("/api/public/liquidations") || clean.startsWith("/api/public/liquidation-cascades")) {
+    return `${CHART_BASE}?s=${s}&panes=liquidations,oi&heat=1&pr=1`;
+  }
+  if (clean.startsWith("/api/public/options")) return `${CHART_BASE}?s=${s}&panes=oi&lv=1&heat=1&pr=0`;
+  if (clean.startsWith("/api/public/funding") || clean.startsWith("/api/public/heatmap")) return `${CHART_BASE}?s=${s}&panes=funding,oi&heat=1&pr=0`;
+  if (clean.startsWith("/api/public/oi")) return `${CHART_BASE}?s=${s}&panes=oi,funding&heat=1&pr=0`;
+  if (clean.startsWith("/api/public/positioning") || clean.startsWith("/api/public/long-short")) return `${CHART_BASE}?s=${s}&panes=long_short,top_traders&heat=0&pr=0`;
+  if (clean.startsWith("/api/public/etf")) return `${CHART_BASE}?s=${s}&p=1d&panes=etf_flow&heat=0&pr=0`;
+  if (clean.startsWith("/api/public/hyperliquid-whales")) return `${CHART_BASE}?s=${s}&panes=whale_net,oi&heat=1&pr=1`;
+  return null;
 }
 
 export function buildProvenance(
@@ -130,6 +165,7 @@ export function buildProvenance(
   const since = str(d.recorded_since) ?? str(d.history_since) ?? str(meta.recorded_since) ?? str(meta.history_since);
   return {
     source_page: at.sourcePage,
+    ...(chartUrlForApiPath(at.apiPath) ? { chart_url: chartUrlForApiPath(at.apiPath)!, chart_image_url: chartUrlForApiPath(at.apiPath)!.replace("/chart?", "/api/og/chart?") } : {}),
     api_path: at.apiPath,
     generated_at: str(d.generatedAt) ?? str(d.generated_at) ?? str(d.as_of) ?? str(d.asOf) ?? str(meta.generatedAt) ?? str(meta.generated_at) ?? str(meta.as_of) ?? null,
     fetched_at: at.fetchedAt,

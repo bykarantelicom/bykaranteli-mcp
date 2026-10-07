@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.33.0] - 2026-10-07
+
+67 tools.
+
+### Added
+
+- Provenance: every answer whose route has a chart twin carries `chart_url` (the SuperChart address that opens on the same symbol, period and layers) and `chart_image_url` (a 1200 x 630 PNG of that view) next to `source_page` and `api_path`. Routes with a twin: series, the liquidation map and liquidation routes, options, funding and the funding heatmap, open interest, positioning, ETF flows and Hyperliquid whales.
+
 ## [0.32.0] - 2026-10-06
 
 67 tools.
