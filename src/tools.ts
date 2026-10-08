@@ -286,7 +286,7 @@ server.registerTool(
           ? `rows is capped at ${MAX_ROWS} of ${filtered.length} matching rows (largest first). Use summary.totals and summary.by_date for complete figures, or pass a symbol filter. ` + baseNote
           : baseNote,
         source: `${PUBLIC_URL}/liquidations`,
-        provenance: provenanceFor(d, "/api/v1/public/datasets/liquidations-daily.json", "/liquidations"),
+        provenance: provenanceFor(d, `/api/v1/public/datasets/liquidations-daily.json${wantSymbol ? `?symbol=${wantSymbol}` : ""}`, "/liquidations"),
       });
     } catch (err) {
       return fail(err);
@@ -332,7 +332,7 @@ server.registerTool(
         truncated: dates.length < new Set(filtered.map((r) => String(r.date))).size,
         note: "Finalized US trading days only; a positive net_inflow_usd means the funds bought more of the asset than they sold that day. window_net_inflow_usd sums the returned window per asset.",
         source: `${PUBLIC_URL}/etf`,
-        provenance: provenanceFor(d, "/api/v1/public/datasets/etf-flows.json", "/etf"),
+        provenance: provenanceFor(d, `/api/v1/public/datasets/etf-flows.json${asset ? `?asset=${asset}` : ""}`, "/etf"),
       });
     } catch (err) {
       return fail(err);

@@ -86,11 +86,12 @@ function chartSymbol(q: URLSearchParams): string {
   if (!raw) return "BTCUSDT";
   return /USDT$|USD$|PERP$/.test(raw) ? raw : `${raw}USDT`;
 }
-/** The venue and the window of the request as chart keys (empty when the request names neither). */
-function chartExtras(q: URLSearchParams, periodMs: number): string {
+/** The venue and the window of the request as chart keys (empty when the request names neither). `venueKey` is the
+ * chart key the venue belongs to: v for the OI and funding panes, lvv for the options levels (2026-10-08). */
+function chartExtras(q: URLSearchParams, periodMs: number, venueKey: "v" | "lvv" = "v"): string {
   let out = "";
   const venue = (q.get("venue") ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (venue && venue !== "binance" && venue !== "all") out += `&v=${venue}`;
+  if (venue && venue !== "all" && (venueKey === "lvv" || venue !== "binance")) out += `&${venueKey}=${venue}`;
   const toRaw = q.get("to");
   const fromRaw = q.get("from");
   const to = toRaw ? Date.parse(toRaw) : NaN;
@@ -114,7 +115,7 @@ export function chartUrlForApiPath(path: string): string | null {
   if (clean.startsWith("/api/liqmap/") || clean.startsWith("/api/public/liqmap") || clean.startsWith("/api/public/liquidations") || clean.startsWith("/api/public/liquidation-cascades") || clean.startsWith("/api/v1/public/datasets/liquidation") || clean === "/api/public/incidents") {
     return `${CHART_BASE}?s=${s}&panes=liquidations,oi&heat=1&pr=1&rv=1${x}`;
   }
-  if (clean.startsWith("/api/public/options")) return `${CHART_BASE}?s=${s}&panes=oi&lv=1&heat=1&pr=0${x}`;
+  if (clean.startsWith("/api/public/options")) return `${CHART_BASE}?s=${s}&panes=oi&lv=1&heat=1&pr=0${chartExtras(q, 0, "lvv")}`;
   if (clean.startsWith("/api/public/funding") || clean.startsWith("/api/public/heatmap")) return `${CHART_BASE}?s=${s}&panes=funding,oi&heat=1&pr=0${x}`;
   if (clean.startsWith("/api/public/oi")) return `${CHART_BASE}?s=${s}&panes=oi,funding&heat=1&pr=0${x}`;
   if (clean.startsWith("/api/public/positioning") || clean.startsWith("/api/public/long-short")) return `${CHART_BASE}?s=${s}&panes=long_short,top_traders&heat=0&pr=0${x}`;

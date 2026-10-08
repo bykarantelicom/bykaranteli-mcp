@@ -2,6 +2,15 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.34.3] - 2026-10-08
+
+67 tools.
+
+### Fixed
+
+- `chart_url` of `get_liquidations` and `get_etf_flows` opens the symbol or asset the call filtered on (the dataset path carried no filter, so every link opened BTCUSDT).
+- `chart_url` of `get_options_snapshot` with a venue sets the options levels' own key (`lvv`), not the OI and funding panes' venue (`v`), so the chart draws the same venue's levels the answer reports.
+
 ## [0.34.2] - 2026-10-08
 
 67 tools.
