@@ -2,6 +2,15 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.34.2] - 2026-10-08
+
+67 tools.
+
+### Changed
+
+- Provenance `chart_url`: the venue asked for rides on the link as `v`, a bounded window (`to` plus `limit` bars, or `from` and `to`) as `r=from..to` in unix seconds, and the routes behind `get_liquidations`, `get_etf_flows` and `get_liquidation_cascades` (the dataset and incident routes) now have chart twins too; the liquidation twins open the recorded event marks (`rv=1`).
+- `get_series`: the description says which periods stay member depth on a key (1m, 3m, 5m, 10m) and that the answer names the venue it was read from (`venue`) and every venue a market-wide series sums (`venues`).
+
 ## [0.34.1] - 2026-10-07
 
 67 tools.

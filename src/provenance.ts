@@ -76,12 +76,29 @@ function venueId(item: unknown): string | undefined {
 
 /* Chart block phase 2 (2026-10-07): the SuperChart address that shows what an answer holds, so an agent can hand the
  * reader a chart that opens on the same symbol, period and layers (chart-url-state.ts keys: s, p, panes, heat, pr,
- * lv). Null for routes with no chart twin. The symbol defaults to BTCUSDT when the query names none. */
+ * lv, v, r, rv). Null for routes with no chart twin. The symbol defaults to BTCUSDT when the query names none. Since
+ * 2026-10-08 (the desk's MCP test): the venue asked for rides as v, a bounded window (to plus limit bars, or from
+ * and to) as r=from..to in unix seconds, and the dataset and incident routes have their twins too. */
 const CHART_BASE = "https://bykaranteli.com/chart";
+const CHART_PERIOD_MS: Record<string, number> = { "1m": 60_000, "3m": 180_000, "5m": 300_000, "10m": 600_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000, "6h": 21_600_000, "8h": 28_800_000, "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000, "1w": 604_800_000, "1M": 2_592_000_000 };
 function chartSymbol(q: URLSearchParams): string {
   const raw = (q.get("symbol") ?? q.get("coin") ?? q.get("currency") ?? q.get("asset") ?? "BTC").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!raw) return "BTCUSDT";
   return /USDT$|USD$|PERP$/.test(raw) ? raw : `${raw}USDT`;
+}
+/** The venue and the window of the request as chart keys (empty when the request names neither). */
+function chartExtras(q: URLSearchParams, periodMs: number): string {
+  let out = "";
+  const venue = (q.get("venue") ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (venue && venue !== "binance" && venue !== "all") out += `&v=${venue}`;
+  const toRaw = q.get("to");
+  const fromRaw = q.get("from");
+  const to = toRaw ? Date.parse(toRaw) : NaN;
+  const limit = Number(q.get("limit"));
+  let from = fromRaw ? Date.parse(fromRaw) : NaN;
+  if (!Number.isFinite(from) && Number.isFinite(to) && Number.isFinite(limit) && limit > 0 && periodMs > 0) from = to - limit * periodMs;
+  if (Number.isFinite(from) && Number.isFinite(to) && to > from) out += `&r=${Math.floor(from / 1000)}..${Math.floor(to / 1000)}`;
+  return out;
 }
 export function chartUrlForApiPath(path: string): string | null {
   const [clean, query = ""] = path.split("?");
@@ -91,17 +108,18 @@ export function chartUrlForApiPath(path: string): string | null {
     const metric = (q.get("metric") ?? "price").toLowerCase();
     const period = q.get("period") ?? "1h";
     const panes = metric === "price" || metric === "volume" ? "" : `&panes=${encodeURIComponent(metric)}`;
-    return `${CHART_BASE}?s=${s}&p=${encodeURIComponent(period)}${panes}&heat=1&pr=1`;
+    return `${CHART_BASE}?s=${s}&p=${encodeURIComponent(period)}${panes}${chartExtras(q, CHART_PERIOD_MS[period] ?? 0)}&heat=1&pr=1`;
   }
-  if (clean.startsWith("/api/liqmap/") || clean.startsWith("/api/public/liqmap") || clean.startsWith("/api/public/liquidations") || clean.startsWith("/api/public/liquidation-cascades")) {
-    return `${CHART_BASE}?s=${s}&panes=liquidations,oi&heat=1&pr=1`;
+  const x = chartExtras(q, 0);
+  if (clean.startsWith("/api/liqmap/") || clean.startsWith("/api/public/liqmap") || clean.startsWith("/api/public/liquidations") || clean.startsWith("/api/public/liquidation-cascades") || clean.startsWith("/api/v1/public/datasets/liquidation") || clean === "/api/public/incidents") {
+    return `${CHART_BASE}?s=${s}&panes=liquidations,oi&heat=1&pr=1&rv=1${x}`;
   }
-  if (clean.startsWith("/api/public/options")) return `${CHART_BASE}?s=${s}&panes=oi&lv=1&heat=1&pr=0`;
-  if (clean.startsWith("/api/public/funding") || clean.startsWith("/api/public/heatmap")) return `${CHART_BASE}?s=${s}&panes=funding,oi&heat=1&pr=0`;
-  if (clean.startsWith("/api/public/oi")) return `${CHART_BASE}?s=${s}&panes=oi,funding&heat=1&pr=0`;
-  if (clean.startsWith("/api/public/positioning") || clean.startsWith("/api/public/long-short")) return `${CHART_BASE}?s=${s}&panes=long_short,top_traders&heat=0&pr=0`;
-  if (clean.startsWith("/api/public/etf")) return `${CHART_BASE}?s=${s}&p=1d&panes=etf_flow&heat=0&pr=0`;
-  if (clean.startsWith("/api/public/hyperliquid-whales")) return `${CHART_BASE}?s=${s}&panes=whale_net,oi&heat=1&pr=1`;
+  if (clean.startsWith("/api/public/options")) return `${CHART_BASE}?s=${s}&panes=oi&lv=1&heat=1&pr=0${x}`;
+  if (clean.startsWith("/api/public/funding") || clean.startsWith("/api/public/heatmap")) return `${CHART_BASE}?s=${s}&panes=funding,oi&heat=1&pr=0${x}`;
+  if (clean.startsWith("/api/public/oi")) return `${CHART_BASE}?s=${s}&panes=oi,funding&heat=1&pr=0${x}`;
+  if (clean.startsWith("/api/public/positioning") || clean.startsWith("/api/public/long-short")) return `${CHART_BASE}?s=${s}&panes=long_short,top_traders&heat=0&pr=0${x}`;
+  if (clean.startsWith("/api/public/etf") || clean.startsWith("/api/v1/public/datasets/etf")) return `${CHART_BASE}?s=${s}&p=1d&panes=etf_flow&heat=0&pr=0${x}`;
+  if (clean.startsWith("/api/public/hyperliquid-whales")) return `${CHART_BASE}?s=${s}&panes=whale_net,oi&heat=1&pr=1&hw=1${x}`;
   return null;
 }
 
