@@ -180,8 +180,8 @@ Server: MIT. Data: personal and research use with attribution "ByKaranteli (byka
 | Free API | 30 / min | 15,000 | public pages |
 | Terminal | 60 / min | 150,000 | public pages |
 | Builder | 300 / min | 1,000,000 fair use | member depth, x402 catalog: 1,000 calls a month included over the last 90 days at up to 5,000 rows a call, summary series only, raw record routes paid per call |
-| Business | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, x402 catalog: 10,000 calls a month included over the last 365 days with raw records, monthly bulk |
-| Scale | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog with no monthly ceiling over the whole archive with raw records, daily raw |
+| Business | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, x402 catalog: 10,000 calls a month included over the last 365 days with raw records, monthly bulk exports over the same window |
+| Scale | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog with no monthly ceiling over the whole archive with raw records, monthly bulk exports over the whole archive |
 
 Prices: https://bykaranteli.com/pricing
 

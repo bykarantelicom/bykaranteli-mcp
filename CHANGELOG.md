@@ -2,6 +2,15 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.34.4] - 2026-10-09
+
+67 tools. README only; the server code is the same as 0.34.3.
+
+### Changed
+
+- README plan table and x402 paragraph follow the 2026-10-09 plan ladder: Builder includes 1,000 x402 catalog calls a month over the last 90 days at up to 5,000 rows a call, with raw record routes paid per call; Business 10,000 a month over the last 365 days with raw records; Scale has no monthly ceiling and reads the whole archive. A call past the ceiling, before the window or on a raw record route below Business answers with the way to pay per call (a prepaid key in `x-api-key`, or a wallet without the account key) or to move up a plan.
+- README bulk exports line names its window: Business the last 365 days, Scale the whole archive (Scale listed "daily raw" exports, which the plan never carried).
+
 ## [0.34.3] - 2026-10-08
 
 67 tools.
