@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.34.5] - 2026-10-09
+
+67 tools. README only; the server code is the same as 0.34.3.
+
+### Changed
+
+- README introduction: the paid plans bring a monthly allowance of x402 catalog calls within each plan's history window (it said the catalog was included in the monthly fair use, which the 2026-10-09 ladder replaced with a ceiling and a window), with a link to the plan table.
+
 ## [0.34.4] - 2026-10-09
 
 67 tools. README only; the server code is the same as 0.34.3.
