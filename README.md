@@ -197,5 +197,7 @@ no account): <https://bykaranteli.com/developers#x402> · machine catalog:
 <https://bykaranteli.com/api/x402>. Builder, Business and Scale keys call those
 routes unpaid within the plan's catalog allowance (table above); each included
 call also counts as 10 requests of the monthly fair use. A call the plan does not
-include answers `x402_allowance_used`, `history_window` or `raw_tier_required`:
-pay it with a prepaid key in `x-api-key`, or without the account key from a wallet.
+include answers `x402_allowance_used`, `history_window` or `raw_tier_required`, and a
+route the plan does not carry answers `tier_required` (bulk exports start at Business):
+pay it with a prepaid key in `x-api-key` while the account key stays in
+`Authorization: Bearer`, or without the account key from a wallet.

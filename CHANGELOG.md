@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.34.6] - 2026-10-09
+
+67 tools. README only; the server code is the same as 0.34.3.
+
+### Changed
+
+- README x402 paragraph: a route the plan does not carry answers `tier_required` (bulk exports start at Business), next to `x402_allowance_used`, `history_window` and `raw_tier_required`; paying such a call with a prepaid key in `x-api-key` keeps the account key in `Authorization: Bearer` (a key sent in `x-api-key` is read as the account key).
+
 ## [0.34.5] - 2026-10-09
 
 67 tools. README only; the server code is the same as 0.34.3.
