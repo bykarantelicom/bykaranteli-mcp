@@ -179,9 +179,9 @@ Server: MIT. Data: personal and research use with attribution "ByKaranteli (byka
 |---|---|---|---|
 | Free API | 30 / min | 15,000 | public pages |
 | Terminal | 60 / min | 150,000 | public pages |
-| Builder | 300 / min | 1,000,000 fair use | member depth, x402 catalog included, each call counts as 10 requests of the monthly fair use |
-| Business | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, x402 catalog included, each call counts as 10 requests of the monthly fair use, monthly bulk |
-| Scale | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog included, each call counts as 10 requests of the monthly fair use, daily raw |
+| Builder | 300 / min | 1,000,000 fair use | member depth, x402 catalog: 1,000 calls a month included over the last 90 days, raw record routes per call |
+| Business | 1,200 / min | 3,000,000 fair use | member depth, commercial licence, x402 catalog: 10,000 calls a month included over the last 365 days with raw records, monthly bulk |
+| Scale | 3,000 / min | 10,000,000 fair use | member depth, derived redistribution, x402 catalog with no monthly ceiling over the whole archive with raw records, daily raw |
 
 Prices: https://bykaranteli.com/pricing
 
@@ -195,4 +195,7 @@ raw records beyond the live snapshots, bykaranteli.com also exposes pay-per-call
 x402 endpoints for anonymous agents (USDC on Solana or Base, priced per call,
 no account): <https://bykaranteli.com/developers#x402> · machine catalog:
 <https://bykaranteli.com/api/x402>. Builder, Business and Scale keys call those
-routes unpaid; each call counts as 10 requests of the monthly fair use.
+routes unpaid within the plan's catalog allowance (table above); each included
+call also counts as 10 requests of the monthly fair use. A call the plan does not
+include answers `x402_allowance_used`, `history_window` or `raw_tier_required`:
+pay it with a prepaid key in `x-api-key`, or without the account key from a wallet.
