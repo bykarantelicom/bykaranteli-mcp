@@ -70,6 +70,7 @@ check(
   tools.filter((t) => !WRITE_TOOLS.has(t.name) && !ACCOUNT_READ_TOOLS.has(t.name)).every((t) => t.annotations?.readOnlyHint === true && t.annotations?.openWorldHint === true),
   "",
 );
+check("every tool has annotations.title equal to its title (directory portals read it there)", tools.every((t) => typeof t.annotations?.title === "string" && t.annotations.title === t.title), tools.filter((t) => t.annotations?.title !== t.title).map((t) => t.name).join(","));
 check("account reads annotated read-only", tools.filter((t) => ACCOUNT_READ_TOOLS.has(t.name)).every((t) => t.annotations?.readOnlyHint === true), "");
 check(
   "write tools annotated as writes, removals destructive",

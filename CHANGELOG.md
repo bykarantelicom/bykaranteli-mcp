@@ -2,6 +2,16 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.35.1] - 2026-10-11
+
+67 tools.
+
+### Changed
+
+- Every tool carries `annotations.title`, the same text as its top-level `title`: directory portals (the Claude Connectors Directory among them) read the display name there. The read-only, destructive, idempotent and open-world hints are unchanged.
+- Descriptions name plans, not keys: depth and limits follow the account's plan whether the client signed in with OAuth or sends an account key (`get_liqmap`, `get_series`, `get_options_chain`, `get_solana_perps`, the account tools).
+- `get_series` returns the newest 300 bars when neither `from` nor `limit` is given (Builder and higher plans received 1,000 by default, 64,700 characters for price); `limit` and `from`/`to` still return up to 5,000.
+
 ## [0.35.0] - 2026-10-11
 
 67 tools.

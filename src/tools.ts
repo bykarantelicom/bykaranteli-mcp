@@ -31,7 +31,17 @@ export type RegisterOptions = {
   authorizationProvider?: () => string | undefined;
 };
 
-export function registerByKaranteliTools(server: McpServer, options?: RegisterOptions): void {
+export function registerByKaranteliTools(target: McpServer, options?: RegisterOptions): void {
+  /* Directory portals read a tool's display name from annotations.title (the MCP 2025-03-26 field), not from the
+   * top-level title (2025-06-18): every tool carries both, the same text (Connectors Directory review, 2026-10-11).
+   * The hints stay exactly as each tool declares them. The caller's server object is not modified. */
+  type ToolDef = { title?: string; annotations?: Record<string, unknown> } & Record<string, unknown>;
+  const withTitle = (def: ToolDef): ToolDef =>
+    def.title && !(def.annotations && "title" in def.annotations) ? { ...def, annotations: { ...(def.annotations ?? {}), title: def.title } } : def;
+  const server = {
+    registerTool: (name: string, def: ToolDef, handler: unknown) =>
+      (target.registerTool as unknown as (n: string, d: ToolDef, h: unknown) => unknown).call(target, name, withTitle(def), handler),
+  } as unknown as McpServer;
   const BASE_URL = (options?.baseUrl ?? process.env.BYKARANTELI_BASE_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
   const PUBLIC_URL = (options?.publicUrl ?? process.env.BYKARANTELI_PUBLIC_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
   const USER_AGENT = `bykaranteli-mcp/${options?.version ?? "dev"} (+https://github.com/bykarantelicom/bykaranteli-mcp)`;
@@ -1380,7 +1390,7 @@ server.registerTool(
   {
     title: "LiqMap: estimated liquidation clusters with real prints overlaid",
     description:
-      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). Without an account key (or on the Free plan) the 24h view; with a Builder or higher key (BYKARANTELI_API_KEY) every timeframe from 1h to 30d. By default the 30 real levels nearest the price and the 30 newest real prints; pass detail=true for all of them.",
+      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). On the Free plan the 24h view; on Builder and higher plans every timeframe from 1h to 30d. By default the 30 real levels nearest the price and the 30 newest real prints; pass detail=true for all of them.",
     inputSchema: {
       symbol: z
         .string()
@@ -1392,7 +1402,7 @@ server.registerTool(
       timeframe: z
         .enum(["1h", "4h", "12h", "24h", "3d", "1w", "30d"])
         .optional()
-        .describe("Model window. Default 24h, the only one served without a Builder or higher key."),
+        .describe("Model window. Default 24h, the only one on the Free plan; Builder and higher plans get every window."),
       detail: z.boolean().optional().describe("Optional. true: every real level and every real print (default false: the 30 nearest levels, the 30 newest prints)."),
     },
     annotations: READ_ONLY,
@@ -1737,12 +1747,12 @@ server.registerTool(
   {
     title: "Options chain hour by hour: open interest and IV per expiry and strike, the change over 1h and 24h, the ATM IV path",
     description:
-      "Call this when the user asks how the BTC or ETH option chain moved today or over the last day: open interest and mark IV per expiry and strike from ByKaranteli's own hourly capture of every listed venue, the change over the last hour and the last 24 hours, and the front expiry's ATM IV hour by hour. Anonymous depth lists the largest strikes; a key with member depth lists every strike. Recorded from 2026-09-30, so the first days carry a short history.",
+      "Call this when the user asks how the BTC or ETH option chain moved today or over the last day: open interest and mark IV per expiry and strike from ByKaranteli's own hourly capture of every listed venue, the change over the last hour and the last 24 hours, and the front expiry's ATM IV hour by hour. The Free plan lists the largest strikes; Builder and higher plans list every strike. Recorded from 2026-09-30, so the first days carry a short history.",
     inputSchema: {
       currency: z.enum(["BTC", "ETH"]).optional().describe("BTC or ETH (default BTC)"),
       venue: z.enum(["all", "deribit", "bybit", "binance", "okx", "delta"]).optional().describe("One venue or all (default all)"),
       expiry: z.string().trim().toUpperCase().regex(/^\d{1,2}[A-Z]{3}\d{2}$/).optional().describe("Expiry as DDMONYY, e.g. 31OCT26 (default: every expiry)"),
-      strikes: z.enum(["top", "all"]).optional().describe("top (largest strikes) or all (member depth)"),
+      strikes: z.enum(["top", "all"]).optional().describe("top (largest strikes) or all (Builder and higher plans)"),
     },
     annotations: READ_ONLY,
   },
@@ -1850,7 +1860,7 @@ server.registerTool(
   {
     title: "Solana Perps board: open interest, 24h volume and hourly rates across six Solana perpetual venues (Jupiter, Pacifica, Phoenix, GM Trade, Velocity, Bullet)",
     description:
-      "Call this when the user asks about perpetuals on Solana as a whole, which Solana perp DEX has the most open interest or volume, a market on Pacifica, Phoenix, GM Trade (GMX on Solana), Velocity (the Drift relaunch) or Bullet (funding, open interest, 24h volume, mark), or how Jupiter compares with the order-book venues. Returns the board read every 10 minutes: per-venue totals (one-sided open interest, both sides on pool venues, 24h volume, market count, median hourly rate, as_of), every market of every venue largest first with instrument type (perpetual, equity, index, commodity, fx), and optional hourly history of one market on any venue but Jupiter (7 days free, 30 with member depth; Jupiter history is get_jupiter_perps). Without venue, the 30 largest markets; pass venue, or limit (up to 300) for more.",
+      "Call this when the user asks about perpetuals on Solana as a whole, which Solana perp DEX has the most open interest or volume, a market on Pacifica, Phoenix, GM Trade (GMX on Solana), Velocity (the Drift relaunch) or Bullet (funding, open interest, 24h volume, mark), or how Jupiter compares with the order-book venues. Returns the board read every 10 minutes: per-venue totals (one-sided open interest, both sides on pool venues, 24h volume, market count, median hourly rate, as_of), every market of every venue largest first with instrument type (perpetual, equity, index, commodity, fx), and optional hourly history of one market on any venue but Jupiter (7 days on the Free plan, 30 on Builder and higher plans; Jupiter history is get_jupiter_perps). Without venue, the 30 largest markets; pass venue, or limit (up to 300) for more.",
     inputSchema: {
       venue: z.string().trim().toLowerCase().regex(/^(jupiter|pacifica|phoenix|gmtrade|velocity|bullet)$/).optional().describe("Venue filter: jupiter, pacifica, phoenix, gmtrade, velocity or bullet"),
       /* Passed as typed: Pacifica and Phoenix list mixed-case markets (kBONK, kPEPE, kSHIB) and the route matches the
@@ -2055,7 +2065,7 @@ async function resolveWatchlist(watchlistId: unknown): Promise<{ ok: true; list:
 
 server.registerTool("get_series", {
   title: "Recorded series: bars or points of one metric for one perpetual (price, OI, funding, CVD, liquidations, long/short, RSI and more)",
-  description: `Call this when the user wants the history of one recorded metric for one perpetual as a time series: price candles, volume, perp or spot CVD, open interest, funding (one venue, or OI-weighted across every venue as funding_agg), liquidations, long/short ratios, RSI, the Coinbase premium, US spot ETF flows, borrow rates or Hyperliquid whale net flow, for charting, backtesting or "what did X do over the last N days". Returns the /api/series answer (points as [t, v], or [t, o, h, l, c, v] for price, with unit, kind, source and source_kind, the bars served and whether member depth applied) plus provenance. metric is one of: ${SERIES_METRIC_KEYS.join(", ")} (unit, finest period and venue support of each: https://bykaranteli.com/api/series/metrics). Public depth serves fewer bars and no bars under 15 minutes (1m, 3m, 5m, 10m); a Builder key and above get member depth; the bar limits are in the same list. The answer names the venue it was read from (venue) and every venue a market-wide series sums (venues). Pass from and to (ISO) for a window, or limit for the newest bars.`,
+  description: `Call this when the user wants the history of one recorded metric for one perpetual as a time series: price candles, volume, perp or spot CVD, open interest, funding (one venue, or OI-weighted across every venue as funding_agg), liquidations, long/short ratios, RSI, the Coinbase premium, US spot ETF flows, borrow rates or Hyperliquid whale net flow, for charting, backtesting or "what did X do over the last N days". Returns the /api/series answer (points as [t, v], or [t, o, h, l, c, v] for price, with unit, kind, source and source_kind, the bars served and whether member depth applied) plus provenance. metric is one of: ${SERIES_METRIC_KEYS.join(", ")} (unit, finest period and venue support of each: https://bykaranteli.com/api/series/metrics). The Free plan gets public depth: fewer bars and no bars under 15 minutes (1m, 3m, 5m, 10m); Builder and higher plans get member depth; the bar limits are in the same list. The answer names the venue it was read from (venue) and every venue a market-wide series sums (venues). Without from or limit, the newest 300 bars; pass from and to (ISO) for a window, or limit for more of the newest bars.`,
   inputSchema: {
     metric: z.string().describe("string, metric key, e.g. price, oi, funding, liquidations (list: /api/series/metrics)"),
     symbol: z.string().optional().describe("string, optional Binance USDT-M perp or coin, e.g. BTCUSDT or BTC (default BTCUSDT)"),
@@ -2063,7 +2073,7 @@ server.registerTool("get_series", {
     venue: z.string().optional().describe("string, optional venue id for price, oi, funding or borrow, e.g. okx (default binance)"),
     from: z.string().optional().describe("string, optional ISO start, e.g. 2026-09-01T00:00:00Z"),
     to: z.string().optional().describe("string, optional ISO end (default now)"),
-    limit: z.number().optional().describe(`number, optional newest bars, 10..${SERIES_MEMBER_BAR_LIMIT}; the key's depth caps it`),
+    limit: z.number().optional().describe(`number, optional newest bars, 10..${SERIES_MEMBER_BAR_LIMIT}; the plan's depth caps it (default 300 without from)`),
   },
   annotations: READ_ONLY,
 }, async (args: Record<string, unknown> = {}) => {
@@ -2080,6 +2090,8 @@ server.registerTool("get_series", {
   let limit = typeof args.limit === "number" && Number.isFinite(args.limit) && args.limit > 0 ? Math.floor(args.limit) : undefined;
   const bars = from ? Math.ceil((end.getTime() - from.getTime()) / PERIOD_MS[period]) : undefined;
   if (bars !== undefined) limit = Math.min(limit ?? bars, bars);
+  /* 0.35.1: the newest 300 bars when neither from nor limit is given (the route gives members 1000 by default). */
+  if (limit === undefined) limit = 300;
   if (limit !== undefined) limit = Math.max(10, Math.min(SERIES_MEMBER_BAR_LIMIT, limit));
   const q = new URLSearchParams({ metric, symbol, period });
   if (limit !== undefined) q.set("limit", String(limit));
@@ -2106,7 +2118,7 @@ server.registerTool("parse_alert_text", {
 
 server.registerTool("list_alert_recipes", {
   title: "Your alert recipes: every alert on your account with its conditions, scope, channels and when it last fired",
-  description: "Call this when the user asks which alerts they have, whether an alert fired, or before deleting or changing one. Returns the account's alert recipes (id, name, scope, symbols, conditions, cooldown in hours, enabled, last fired, fire count, channels). Needs the account key; reads nothing but this account.",
+  description: "Call this when the user asks which alerts they have, whether an alert fired, or before deleting or changing one. Returns the account's alert recipes (id, name, scope, symbols, conditions, cooldown in hours, enabled, last fired, fire count, channels). Needs a signed-in account (OAuth sign-in or account key); reads nothing but this account.",
   inputSchema: {},
   annotations: ACCOUNT_READ,
 }, async () => {
@@ -2116,7 +2128,7 @@ server.registerTool("list_alert_recipes", {
 
 server.registerTool("create_alert_recipe", {
   title: "Create an alert recipe (writes to your account)",
-  description: `Call this when the user asks to be alerted when a metric crosses a threshold and has agreed to the exact condition (parse_alert_text turns their words into one). Saves an alert recipe on the account: it fires when every condition holds, delivers by Telegram first with email as fallback unless channels says otherwise, and waits cooldown_hours before it fires again for the same symbol. field is one of: ${RECIPE_FIELD_KEYS.join(", ")}; op is one of ${RECIPE_OPS.join(" ")}; percent fields take percent values (0.05 means 0.05%). Pass field, op and threshold for one condition, or conditions for up to ${RECIPE_LIMITS.MAX_CONDITIONS}. scope: watchlist (default), any, or symbols with symbols. The plan sets how many recipes an account keeps; past it the tool answers with the limit. Writes are rate limited per key and each one is recorded on the account.`,
+  description: `Call this when the user asks to be alerted when a metric crosses a threshold and has agreed to the exact condition (parse_alert_text turns their words into one). Saves an alert recipe on the account: it fires when every condition holds, delivers by Telegram first with email as fallback unless channels says otherwise, and waits cooldown_hours before it fires again for the same symbol. field is one of: ${RECIPE_FIELD_KEYS.join(", ")}; op is one of ${RECIPE_OPS.join(" ")}; percent fields take percent values (0.05 means 0.05%). Pass field, op and threshold for one condition, or conditions for up to ${RECIPE_LIMITS.MAX_CONDITIONS}. scope: watchlist (default), any, or symbols with symbols. The plan sets how many recipes an account keeps; past it the tool answers with the limit. Writes are rate limited per connection (sign-in or key) and each one is recorded on the account.`,
   inputSchema: {
     field: z.string().optional().describe("string, one condition's metric, e.g. funding_rate_pct"),
     op: z.enum(RECIPE_OPS as [string, ...string[]]).optional().describe(`string, one condition's comparison: ${RECIPE_OPS.join(" | ")}`),
@@ -2169,7 +2181,7 @@ server.registerTool("create_alert_recipe", {
 
 server.registerTool("delete_alert_recipe", {
   title: "Delete one of your alert recipes (writes to your account)",
-  description: "Call this when the user asks to remove an alert. Deletes the alert recipe with this id from the account (list_alert_recipes shows the ids); an id that is not one of the account's recipes changes nothing and says so. Writes are rate limited per key and each one is recorded on the account.",
+  description: "Call this when the user asks to remove an alert. Deletes the alert recipe with this id from the account (list_alert_recipes shows the ids); an id that is not one of the account's recipes changes nothing and says so. Writes are rate limited per connection (sign-in or key) and each one is recorded on the account.",
   inputSchema: {
     id: z.string().describe("string, the recipe id from list_alert_recipes"),
   },
@@ -2185,7 +2197,7 @@ server.registerTool("delete_alert_recipe", {
 
 server.registerTool("list_watchlists", {
   title: "Your watchlists and the symbols on each",
-  description: "Call this when the user asks what is on their watchlist, which lists they have, or before adding or removing a symbol. Returns the account's watchlists (id, name, symbol count) and, unless include_symbols is false, the symbols on each list in order. Needs the account key; reads nothing but this account.",
+  description: "Call this when the user asks what is on their watchlist, which lists they have, or before adding or removing a symbol. Returns the account's watchlists (id, name, symbol count) and, unless include_symbols is false, the symbols on each list in order. Needs a signed-in account (OAuth sign-in or account key); reads nothing but this account.",
   inputSchema: {
     include_symbols: z.boolean().optional().describe("boolean, optional: include each list's symbols (default true)"),
   },
@@ -2206,7 +2218,7 @@ server.registerTool("list_watchlists", {
 
 server.registerTool("add_watchlist_symbol", {
   title: "Add a symbol to your watchlist (writes to your account)",
-  description: "Call this when the user asks to watch, follow or add a coin to their watchlist. Adds the symbol to the list named by watchlist_id, else to the default list (or the only list the account has); a symbol already on the list stays once. Returns the list's symbols after the change. Writes are rate limited per key and each one is recorded on the account.",
+  description: "Call this when the user asks to watch, follow or add a coin to their watchlist. Adds the symbol to the list named by watchlist_id, else to the default list (or the only list the account has); a symbol already on the list stays once. Returns the list's symbols after the change. Writes are rate limited per connection (sign-in or key) and each one is recorded on the account.",
   inputSchema: {
     symbol: z.string().describe("string, a Binance USDT-M perp or coin, e.g. SOLUSDT or SOL"),
     watchlist_id: z.string().optional().describe("string, optional list id from list_watchlists (default: the default list)"),
@@ -2224,7 +2236,7 @@ server.registerTool("add_watchlist_symbol", {
 
 server.registerTool("remove_watchlist_symbol", {
   title: "Remove a symbol from your watchlist (writes to your account)",
-  description: "Call this when the user asks to stop watching a coin or remove it from their watchlist. Removes the symbol from the list named by watchlist_id, else from the default list (or the only list the account has); a symbol that is not on the list changes nothing. Returns the list's symbols after the change. Writes are rate limited per key and each one is recorded on the account.",
+  description: "Call this when the user asks to stop watching a coin or remove it from their watchlist. Removes the symbol from the list named by watchlist_id, else from the default list (or the only list the account has); a symbol that is not on the list changes nothing. Returns the list's symbols after the change. Writes are rate limited per connection (sign-in or key) and each one is recorded on the account.",
   inputSchema: {
     symbol: z.string().describe("string, the symbol to remove, e.g. SOLUSDT or SOL"),
     watchlist_id: z.string().optional().describe("string, optional list id from list_watchlists (default: the default list)"),
