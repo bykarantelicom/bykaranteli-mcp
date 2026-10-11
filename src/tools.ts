@@ -1299,7 +1299,22 @@ async function dailySeries(route: string, days: number | undefined, key: string 
         return { ...data, series: { [key]: data.series[key] } };
       })()
     : data;
-  if (wanted) return ok(withProvenance(narrowed, path));
+  if (wanted) {
+    const answer = withProvenance(narrowed, path);
+    /* Every series over a long window can pass the ceiling (macro, 365 days: 146k characters); name the keys that
+     * fit instead of the generic ceiling note. */
+    if (!key && isRec(data) && isRec(data.series) && JSON.stringify(answer).length > MAX_RESULT_CHARS) {
+      const keys = Object.keys(data.series);
+      return ok({
+        truncated: true,
+        limit: MAX_RESULT_CHARS,
+        note: `Every series over ${wanted} days does not fit one answer. Pass series (one of series_keys) for one key over this window, or fewer days for all of them.`,
+        series_keys: keys,
+        ...(isRec(data.latest) ? { latest: data.latest } : {}),
+      });
+    }
+    return ok(answer);
+  }
   return ok(compact(narrowed, path, (rec, t) => {
     if (!isRec(rec.series)) return;
     const POINTS = 7;
