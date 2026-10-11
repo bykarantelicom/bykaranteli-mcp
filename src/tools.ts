@@ -111,7 +111,7 @@ function withProvenance(data: unknown, path: string): unknown {
  * context window, with no signal that anything was cut (audit 2026-09-04
  * #41). Above the ceiling the tool answers with guidance instead of a
  * payload the caller could not use anyway. */
-const MAX_RESULT_CHARS = 240_000;
+const MAX_RESULT_CHARS = 100_000;
 
 function ok(data: unknown): ToolResult {
   const text = JSON.stringify(data);
@@ -127,6 +127,58 @@ function ok(data: unknown): ToolResult {
       }),
     }],
   };
+}
+
+/* Short default answers (0.35.0). The Connectors Directory asks tools to be frugal with tokens and Claude Code caps one
+ * tool result at 25,000 tokens by default (MAX_MCP_OUTPUT_TOKENS); twenty boards answered 48k to 234k characters on a
+ * call without arguments, one of them nothing but the ceiling note. A call without the detail parameters now returns
+ * a first page, and `trimmed` names every list it shortened, how many items it kept of how many and the parameter
+ * that returns the rest, so nothing is cut silently. Nothing is recomputed: items are kept or left out as the route
+ * sent them. Provenance is built from the full route answer before the cut, so its venues still describe everything
+ * the route read. */
+type Rec = Record<string, unknown>;
+type Cut = { field: string; returned: number; total: number; more: string };
+
+const isRec = (v: unknown): v is Rec => Boolean(v) && typeof v === "object" && !Array.isArray(v);
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+class Trim {
+  readonly cuts: Cut[] = [];
+  /** The first n items in the route's own order; anything that is not a longer list passes through. */
+  head(value: unknown, n: number, field: string, more: string): unknown {
+    if (!Array.isArray(value) || value.length <= n) return value;
+    this.cuts.push({ field, returned: n, total: value.length, more });
+    return value.slice(0, n);
+  }
+  /** One entry for a cut spread over several lists (a field inside every row). */
+  note(field: string, returned: number, total: number, more: string): void {
+    if (returned < total) this.cuts.push({ field, returned, total, more });
+  }
+}
+
+/* The answer with provenance already attached, shortened by `cut`; rows_total and rows_returned describe the main
+ * list when it is named (a route that already counts its rows keeps its own rows_total). */
+function trimmedAnswer(full: unknown, cut: (rec: Rec, t: Trim) => void, rowsField?: string): unknown {
+  if (!isRec(full)) return full;
+  const rec: Rec = { ...full };
+  const total = rowsField && Array.isArray(rec[rowsField]) ? (rec[rowsField] as unknown[]).length : undefined;
+  const t = new Trim();
+  cut(rec, t);
+  if (rowsField && total !== undefined && Array.isArray(rec[rowsField])) {
+    if (rec.rows_total === undefined) rec.rows_total = total;
+    rec.rows_returned = (rec[rowsField] as unknown[]).length;
+  }
+  return t.cuts.length > 0 ? { ...rec, trimmed: t.cuts } : rec;
+}
+
+function compact(data: unknown, path: string, cut: (rec: Rec, t: Trim) => void, rowsField?: string): unknown {
+  return trimmedAnswer(withProvenance(data, path), cut, rowsField);
+}
+
+/** The newest `days` distinct dates of rows carrying a `date` field, in the route's order. */
+function newestDates(rows: unknown[], days: number): Set<string> {
+  const dates = [...new Set(rows.map((r) => (isRec(r) ? String(r.date) : "")))].filter(Boolean).sort().reverse();
+  return new Set(dates.slice(0, days));
 }
 
 function fail(err: unknown): ToolResult {
@@ -198,7 +250,7 @@ server.registerTool(
   {
     title: "Crypto liquidations: daily long/short totals per symbol and exchange",
     description:
-      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own stream collectors on every liquidation venue it counts, listed on bykaranteli.com/coverage (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily.",
+      "Call this when the user asks how much was liquidated in crypto futures, whether longs or shorts got flushed, or for liquidation history. Returns daily long and short liquidation totals in USD per symbol and exchange, recorded from ByKaranteli's own stream collectors on every liquidation venue it counts, listed on bykaranteli.com/coverage (recorded events, a floor, not estimates). One row per finalized UTC day, symbol and exchange; history begins 2026-07-30 and grows daily. Without symbol, rows holds the first 30 rows (newest day, largest first) while summary covers every matching row; pass symbol or limit (up to 400) for more rows.",
     inputSchema: {
       symbol: z
         .string()
@@ -208,10 +260,11 @@ server.registerTool(
         .optional()
         .describe("Optional symbol filter like BTCUSDT or ETHUSDT. Omit for all symbols."),
       days: z.number().int().min(1).max(90).optional().describe("How many most recent days to return (default 7)."),
+      limit: z.coerce.number().int().min(1).max(400).optional().describe("Optional. Rows to return, newest day first and largest first within a day (default 30 without symbol, 400 with one)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol, days }: { symbol?: string; days?: number }) => {
+  async ({ symbol, days, limit }: { symbol?: string; days?: number; limit?: number }) => {
     try {
       const d = (await fetchJson("/api/v1/public/datasets/liquidations-daily.json")) as {
         rows?: Array<Record<string, unknown>>;
@@ -252,7 +305,8 @@ server.registerTool(
         day.rows += 1;
         byDate.set(date, day);
       }
-      const MAX_ROWS = 400;
+      /* 0.35.0: 30 rows without a symbol (the 400-row page was 78k characters); a symbol keeps the old 400. */
+      const MAX_ROWS = limit ?? (wantSymbol ? 400 : 30);
       /* Largest rows first within the cap, newest day first. */
       const ordered = [...filtered].sort((a, b) => {
         const dd = String(b.date).localeCompare(String(a.date));
@@ -279,14 +333,16 @@ server.registerTool(
           })),
         },
         rows: ordered.slice(0, MAX_ROWS),
+        rows_total: filtered.length,
         rows_returned: Math.min(ordered.length, MAX_ROWS),
         rows_matched: filtered.length,
         truncated,
         note: truncated
-          ? `rows is capped at ${MAX_ROWS} of ${filtered.length} matching rows (largest first). Use summary.totals and summary.by_date for complete figures, or pass a symbol filter. ` + baseNote
+          ? `rows is capped at ${MAX_ROWS} of ${filtered.length} matching rows (largest first). Use summary.totals and summary.by_date for complete figures, or pass a symbol filter or limit up to 400. ` + baseNote
           : baseNote,
         source: `${PUBLIC_URL}/liquidations`,
         provenance: provenanceFor(d, `/api/v1/public/datasets/liquidations-daily.json${wantSymbol ? `?symbol=${wantSymbol}` : ""}`, "/liquidations"),
+        ...(truncated ? { trimmed: [{ field: "rows", returned: MAX_ROWS, total: filtered.length, more: "pass symbol, or limit up to 400" }] } : {}),
       });
     } catch (err) {
       return fail(err);
@@ -383,14 +439,35 @@ server.registerTool(
   {
     title: "Cross-exchange funding arbitrage opportunities",
     description:
-      "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across every venue on the board, from Binance, OKX and Bybit to Hyperliquid, dYdX and the smaller perp venues fed by the venue snapshot, for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost).",
-    inputSchema: {},
+      "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across every venue on the board, from Binance, OKX and Bybit to Hyperliquid, dYdX and the smaller perp venues fed by the venue snapshot, for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost). Each row lists its first 5 venue legs; pass symbol for every leg of one perp.",
+    inputSchema: {
+      symbol: z.string().optional().describe("Optional. One perp, e.g. BTCUSDT or BTC: its row with every venue leg."),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ symbol }: { symbol?: string }) => {
     try {
       const d = (await fetchJson("/api/public/funding-arb")) as Record<string, unknown>;
-      return ok({ ...d, source: `${PUBLIC_URL}/funding-arb`, provenance: provenanceFor(d, "/api/public/funding-arb") });
+      const full = { ...d, source: `${PUBLIC_URL}/funding-arb`, provenance: provenanceFor(d, "/api/public/funding-arb") };
+      const rows = list(d.rows).filter(isRec);
+      if (symbol) {
+        const want = normalizeSymbol(symbol);
+        const row = rows.find((r) => r.symbol === want);
+        if (!row) return ok({ generatedAt: d.generatedAt, note: `${want} is not on the funding arbitrage board. Symbols: ${rows.map((r) => String(r.symbol)).join(", ")}` });
+        return ok({ ...full, rows: [row] });
+      }
+      const LEGS = 5;
+      return ok(trimmedAnswer(full, (rec, t) => {
+        let kept = 0;
+        let total = 0;
+        rec.rows = rows.map((r) => {
+          const legs = list(r.exchanges);
+          total += legs.length;
+          kept += Math.min(legs.length, LEGS);
+          return legs.length > LEGS ? { ...r, exchanges: legs.slice(0, LEGS) } : r;
+        });
+        t.note("rows[].exchanges", kept, total, "pass symbol for every venue leg of one perp");
+      }));
     } catch (err) {
       return fail(err);
     }
@@ -522,13 +599,22 @@ server.registerTool(
   {
     title: "Coinbase Premium (US demand gauge) + carry yield",
     description:
-      "Call this when the user asks whether US investors are buying or selling Bitcoin or Ethereum, about the Coinbase Premium, or what the cash-and-carry basis trade pays. Returns the latest daily premium in percent, 7-day average, same-sign streak, the last 30 days, and annualized quarterly carry yields. History since 2017; positive premium = US buying pressure.",
-    inputSchema: {},
+      "Call this when the user asks whether US investors are buying or selling Bitcoin or Ethereum, about the Coinbase Premium, or what the cash-and-carry basis trade pays. Returns the latest daily premium in percent, 7-day average, same-sign streak, the last 30 days, and annualized quarterly carry yields. History since 2017; positive premium = US buying pressure. The kimchi and Turkey premium daily rows cover the last 7 days; pass days (up to 90) for more.",
+    inputSchema: {
+      days: z.coerce.number().int().min(1).max(90).optional().describe("Optional. Days of kimchi and Turkey premium daily rows, newest first (default 7, up to 90)."),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ days }: { days?: number }) => {
     try {
-      return ok(withProvenance(await fetchJson("/api/public/premium"), "/api/public/premium"));
+      return ok(compact(await fetchJson("/api/public/premium"), "/api/public/premium", (rec, t) => {
+        if (!isRec(rec.kimchi)) return;
+        const daily = list(rec.kimchi.daily);
+        const keep = newestDates(daily, days ?? 7);
+        const kept = daily.filter((r) => isRec(r) && keep.has(String(r.date)));
+        t.note("kimchi.daily", kept.length, daily.length, "pass days up to 90");
+        rec.kimchi = { ...rec.kimchi, daily: kept };
+      }));
     } catch (err) {
       return fail(err);
     }
@@ -685,7 +771,7 @@ server.registerTool(
   {
     title: "Tokenized stocks onchain: supply, premium to the real share, DEX pools and exchange pairs",
     description:
-      "Call this when the user asks about tokenized stocks or stock tokens (xStocks, Ondo, Robinhood stock tokens, Coinbase tokenized stocks on Base, Binance bStocks, Backpack, Gate gStocks, Reality, Superstate, Figure, Dinari dShares, Securitize): how much of a stock exists onchain, which issuer or chain holds the most, whether a wrapper trades above or below the real share, which DEX pools or exchanges trade it. Returns the board ByKaranteli refreshes every 10 minutes: per underlying the reference share price and its session, each wrapper (issuer, chain, price, premium_pct against a fresh reference, DEX liquidity and 24h volume from admitted pools, supply in shares and dollars, holders, status), tokenized spot pairs on the exchanges the board lists, the perpetual futures cross, and totals (supply by issuer and chain, DEX volume, median premium). Each wrapper's price_source names the price that valued its supply dollars (reference: the share's reference price; issuer_oracle: the issuer's own price for the token; wrapper: its own pool or exchange price; null: no dollars), and totals.priced_by counts the counted wrappers per level, unpriced included. Wrappers come from issuer sources only, never from a name search.",
+      "Call this when the user asks about tokenized stocks or stock tokens (xStocks, Ondo, Robinhood stock tokens, Coinbase tokenized stocks on Base, Binance bStocks, Backpack, Gate gStocks, Reality, Superstate, Figure, Dinari dShares, Securitize): how much of a stock exists onchain, which issuer or chain holds the most, whether a wrapper trades above or below the real share, which DEX pools or exchanges trade it. Returns the board ByKaranteli refreshes every 10 minutes: per underlying the reference share price and its session, each wrapper (issuer, chain, price, premium_pct against a fresh reference, DEX liquidity and 24h volume from admitted pools, supply in shares and dollars, holders, status), tokenized spot pairs on the exchanges the board lists, the perpetual futures cross, and totals (supply by issuer and chain, DEX volume, median premium). Each wrapper's price_source names the price that valued its supply dollars (reference: the share's reference price; issuer_oracle: the issuer's own price for the token; wrapper: its own pool or exchange price; null: no dollars), and totals.priced_by counts the counted wrappers per level, unpriced included. Wrappers come from issuer sources only, never from a name search. Without underlying, each stock lists its first 3 wrappers and 3 exchange pairs; pass underlying for all of them.",
     inputSchema: {
       underlying: z.string().regex(/^[A-Za-z0-9.]{1,16}$/).optional().describe("Stock ticker, e.g. TSLA; omit for the whole board."),
       /* Issuer ids mirror TOKENIZED_ISSUER_IDS in web/src/lib/tokenized-equities/meta.ts (the hosted tool reads that list
@@ -695,7 +781,7 @@ server.registerTool(
         .optional()
         .describe("One issuer: xstocks, robinhood, coinbase, bstocks, ondo, backpack, gstocks, reality, superstate, figure, dinari or securitize; omit for every issuer."),
       chain: z.string().regex(/^[a-z]{2,12}$/).optional().describe("One chain, e.g. solana, base, bnb, robinhood, ethereum, ton, all (xStocks circulating) or cex (exchange pairs)."),
-      top: z.number().int().min(1).max(200).optional().describe("Rows by supply (default 20, max 200)."),
+      top: z.number().int().min(1).max(200).optional().describe("Rows by supply (default 10, max 200)."),
     },
     annotations: READ_ONLY,
   },
@@ -705,9 +791,29 @@ server.registerTool(
       if (underlying) params.set("underlying", underlying.toUpperCase());
       if (issuer) params.set("issuer", issuer);
       if (chain) params.set("chain", chain);
-      params.set("top", String(top ?? 20));
+      /* 0.35.0: 10 rows by default (20 full rows were 113k characters). */
+      params.set("top", String(top ?? 10));
       const path = `/api/public/tokenized-stocks?${params.toString()}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (underlying) return ok(withProvenance(data, path));
+      const N = 3;
+      return ok(compact(data, path, (rec, t) => {
+        const kept = { wrappers: 0, cex: 0 };
+        const total = { wrappers: 0, cex: 0 };
+        rec.rows = list(rec.rows).map((r) => {
+          if (!isRec(r)) return r;
+          const out: Rec = { ...r };
+          for (const key of ["wrappers", "cex"] as const) {
+            const items = list(r[key]);
+            total[key] += items.length;
+            kept[key] += Math.min(items.length, N);
+            if (items.length > N) out[key] = items.slice(0, N);
+          }
+          return out;
+        });
+        t.note("rows[].wrappers", kept.wrappers, total.wrappers, "pass underlying for every wrapper of one stock");
+        t.note("rows[].cex", kept.cex, total.cex, "pass underlying for every exchange pair of one stock");
+      }, "rows"));
     } catch (err) {
       return fail(err);
     }
@@ -850,12 +956,42 @@ server.registerTool(
   {
     title: "Margin borrow rates per venue: the cost of leverage, hourly",
     description:
-      "Call this when the user asks what it costs to borrow USDT, USDC, BTC, ETH or a major alt on an exchange, which venue has the cheapest borrow, whether stablecoin borrow cost is spiking, or what the carry of a basis trade is on a venue (funding minus borrow). Returns the latest annualised rate per venue and asset, 30 days of hourly series for the stablecoins and majors, and the carry table. Recorded hourly by ByKaranteli (Binance and OKX today).",
-    inputSchema: {},
+      "Call this when the user asks what it costs to borrow USDT, USDC, BTC, ETH or a major alt on an exchange, which venue has the cheapest borrow, whether stablecoin borrow cost is spiking, or what the carry of a basis trade is on a venue (funding minus borrow). Returns the latest annualised rate per venue and asset, 30 days of hourly series for the stablecoins and majors, and the carry table. Recorded hourly by ByKaranteli (Binance and OKX today). The series hold the last 24 hours unless hours (up to 720) or asset is passed.",
+    inputSchema: {
+      asset: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,12}$/).optional().describe("Optional. One asset, e.g. USDT: its rates, carry and full 30-day series."),
+      hours: z.coerce.number().int().min(1).max(720).optional().describe("Optional. Hours of hourly series to return (default 24, or the full 720 with asset)."),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
-    try { return ok(withProvenance(await fetchJson("/api/public/borrow-rates"), "/api/public/borrow-rates")); } catch (err) { return fail(err); }
+  async ({ asset, hours }: { asset?: string; hours?: number }) => {
+    try {
+      const path = "/api/public/borrow-rates";
+      return ok(compact(await fetchJson(path), path, (rec, t) => {
+        const byAsset = (r: unknown) => !asset || (isRec(r) && String(r.asset).toUpperCase() === asset);
+        if (asset) {
+          rec.latest = list(rec.latest).filter(byAsset);
+          rec.carry = list(rec.carry).filter(byAsset);
+          if (list(rec.latest).length === 0) rec.note = `${asset} has no recorded borrow rate; omit asset for every recorded one.`;
+        }
+        const series = list(rec.series).filter(byAsset).filter(isRec);
+        /* Hourly points [ts_ms, value], oldest first; the window ends at the newest point of any series. */
+        let newest = 0;
+        for (const s of series) for (const p of list(s.points)) if (Array.isArray(p) && Number(p[0]) > newest) newest = Number(p[0]);
+        const cutoff = newest - (hours ?? (asset ? 720 : 24)) * 3_600_000;
+        let kept = 0;
+        let total = 0;
+        rec.series = series.map((s) => {
+          const points = list(s.points);
+          const inWindow = points.filter((p) => Array.isArray(p) && Number(p[0]) > cutoff);
+          total += points.length;
+          kept += inWindow.length;
+          return { ...s, points: inWindow };
+        });
+        t.note("series[].points", kept, total, "pass hours up to 720, or asset for one asset's full series");
+      }));
+    } catch (err) {
+      return fail(err);
+    }
   },
 );
 
@@ -878,13 +1014,27 @@ server.registerTool(
   {
     title: "Expiry calendar and settlement prices across venues",
     description:
-      "Call this when the user asks what futures or options expire soon, when the next quarterly expiry is on an exchange, how many contracts settle this week, or at what price a dated future settled. Returns the next 60 days of dated future and option expiries grouped by date, venue and underlying from 54 venues' market lists, plus the settlement prices recorded as dated futures deliver.",
-    inputSchema: {},
+      "Call this when the user asks what futures or options expire soon, when the next quarterly expiry is on an exchange, how many contracts settle this week, or at what price a dated future settled. Returns the next 60 days of dated future and option expiries grouped by date, venue and underlying from 54 venues' market lists, plus the settlement prices recorded as dated futures deliver. Without base, the first 30 expiry rows and the 30 newest settlement prices; pass base for one asset's full lists, or limit (up to 300).",
+    inputSchema: {
+      base: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,16}$/).optional().describe("Optional. One underlying, e.g. BTC: every expiry row and settlement price of that asset."),
+      limit: z.coerce.number().int().min(1).max(300).optional().describe("Optional. Rows per list without base (default 30): expiries soonest first, settlements newest first."),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ base, limit }: { base?: string; limit?: number }) => {
     try {
-      return ok(withProvenance(await fetchJson("/api/public/settlements"), "/api/public/settlements"));
+      const path = "/api/public/settlements";
+      return ok(compact(await fetchJson(path), path, (rec, t) => {
+        if (base) {
+          const byBase = (r: unknown) => isRec(r) && String(r.base).toUpperCase() === base;
+          rec.upcoming = list(rec.upcoming).filter(byBase);
+          rec.recorded = list(rec.recorded).filter(byBase);
+          return;
+        }
+        const n = limit ?? 30;
+        rec.upcoming = t.head(rec.upcoming, n, "upcoming", "pass base for one asset, or limit up to 300");
+        rec.recorded = t.head(rec.recorded, n, "recorded", "pass base for one asset, or limit up to 300");
+      }, base ? undefined : "upcoming"));
     } catch (err) {
       return fail(err);
     }
@@ -914,10 +1064,11 @@ server.registerTool(
   {
     title: "Withdrawal status and network fees: which exchanges paused withdrawals, per asset and network",
     description:
-      "Call this when the user asks whether an exchange has paused withdrawals or deposits, which networks are open for an asset, what the withdrawal fee or minimum is on each venue, or which venue is cheapest to withdraw from. Without arguments returns the overview (withdrawals paused right now, ranked, plus recent suspension and resumption events). Pass asset (e.g. USDT) for every venue and network of that asset, and venue (e.g. kucoin) to narrow. Recorded daily by ByKaranteli from 20+ venues' public currency lists.",
+      "Call this when the user asks whether an exchange has paused withdrawals or deposits, which networks are open for an asset, what the withdrawal fee or minimum is on each venue, or which venue is cheapest to withdraw from. Without arguments returns the overview (withdrawals paused right now, ranked, plus recent suspension and resumption events). Pass asset (e.g. USDT) for every venue and network of that asset, and venue (e.g. kucoin) to narrow. Recorded daily by ByKaranteli from 20+ venues' public currency lists. The overview lists the first 30 paused networks and the 30 newest events; pass asset, or limit (up to 400) for more.",
     inputSchema: {
       asset: z.string().optional().describe("string, optional asset code, e.g. USDT"),
       venue: z.string().optional().describe("string, optional venue id, e.g. kucoin"),
+      limit: z.coerce.number().int().min(1).max(400).optional().describe("Optional. Rows of the overview lists (paused networks, events) without asset (default 30)."),
     },
     annotations: READ_ONLY,
   },
@@ -927,7 +1078,14 @@ server.registerTool(
       if (args.asset) qs.set("asset", String(args.asset).toUpperCase());
       if (args.venue) qs.set("venue", String(args.venue).toLowerCase());
       const q = qs.toString();
-      return ok(withProvenance(await fetchJson(`/api/public/withdrawals${q ? `?${q}` : ""}`), `/api/public/withdrawals${q ? `?${q}` : ""}`));
+      const path = `/api/public/withdrawals${q ? `?${q}` : ""}`;
+      const data = await fetchJson(path);
+      if (args.asset) return ok(withProvenance(data, path));
+      const n = args.limit ?? 30;
+      return ok(compact(data, path, (rec, t) => {
+        rec.suspended_rows = t.head(rec.suspended_rows, n, "suspended_rows", "pass asset for every venue and network of one asset, or limit up to 400");
+        rec.events = t.head(rec.events, n, "events", "pass limit up to 400");
+      }, "suspended_rows"));
     } catch (err) {
       return fail(err);
     }
@@ -939,10 +1097,11 @@ server.registerTool(
   {
     title: "Leverage tiers: max leverage and maintenance margin per perpetual on every venue",
     description:
-      "Call this when the user asks how much leverage an exchange allows on a coin, what the maintenance margin or risk limit ladder is, which venue offers the highest leverage for a symbol, or whether an exchange recently cut leverage. Returns the current ladder per venue (tier, notional floor and cap, max leverage, maintenance margin rate) recorded daily by ByKaranteli, plus a change log. Pass symbol for one base asset (e.g. SOL) and venue for one exchange (bybit, okx, gate, htx, bitget, mexc).",
+      "Call this when the user asks how much leverage an exchange allows on a coin, what the maintenance margin or risk limit ladder is, which venue offers the highest leverage for a symbol, or whether an exchange recently cut leverage. Returns the current ladder per venue (tier, notional floor and cap, max leverage, maintenance margin rate) recorded daily by ByKaranteli, plus a change log. Pass symbol for one base asset (e.g. SOL) and venue for one exchange (bybit, okx, gate, htx, bitget, mexc). Without symbol, the first 30 rows of each list and the first 5 tiers of each ladder; pass symbol for every tier, or limit (up to 300).",
     inputSchema: {
       symbol: z.string().optional().describe("string, optional base asset, e.g. BTC"),
       venue: z.string().optional().describe("string, optional venue id, e.g. bybit"),
+      limit: z.coerce.number().int().min(1).max(300).optional().describe("Optional. Rows per list without symbol (default 30)."),
     },
     annotations: READ_ONLY,
   },
@@ -952,7 +1111,34 @@ server.registerTool(
       if (args.symbol) qs.set("symbol", String(args.symbol).toUpperCase());
       if (args.venue) qs.set("venue", String(args.venue).toLowerCase());
       const q = qs.toString();
-      return ok(withProvenance(await fetchJson(`/api/public/leverage-tiers${q ? `?${q}` : ""}`), `/api/public/leverage-tiers${q ? `?${q}` : ""}`));
+      const path = `/api/public/leverage-tiers${q ? `?${q}` : ""}`;
+      const data = await fetchJson(path);
+      if (args.symbol) return ok(withProvenance(data, path));
+      const n = args.limit ?? 30;
+      const more = "pass symbol for every tier of one base asset, or limit up to 300";
+      return ok(compact(data, path, (rec, t) => {
+        /* venue alone: one flat list of every tier of every contract on that venue (2,000 rows on Bybit). */
+        rec.rows = t.head(rec.rows, n, "rows", more);
+        rec.compare = t.head(rec.compare, n, "compare", more);
+        rec.changes = t.head(rec.changes, n, "changes", "pass limit up to 300");
+        if (isRec(rec.ladders)) {
+          const TIERS = 5;
+          let kept = 0;
+          let total = 0;
+          const ladders: Rec = {};
+          for (const [base, venues] of Object.entries(rec.ladders)) {
+            ladders[base] = list(venues).map((v) => {
+              if (!isRec(v)) return v;
+              const rows = list(v.rows);
+              total += rows.length;
+              kept += Math.min(rows.length, TIERS);
+              return rows.length > TIERS ? { ...v, rows: rows.slice(0, TIERS) } : v;
+            });
+          }
+          rec.ladders = ladders;
+          t.note("ladders.*[].rows", kept, total, "pass symbol for every tier of one base asset");
+        }
+      }, isRec(data) && Array.isArray(data.rows) ? "rows" : "compare"));
     } catch (err) {
       return fail(err);
     }
@@ -964,10 +1150,11 @@ server.registerTool(
   {
     title: "Exchange coverage: OI, volume, funding and pegs across every exchange we snapshot",
     description:
-      "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across every perpetual and spot feed we poll (the coverage field lists them); pass symbol for one coin's per-venue rows.",
+      "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across every perpetual and spot feed we poll (the coverage field lists them); pass symbol for one coin's per-venue rows. Without symbol, rows holds the 30 venue markets with the largest open interest; pass symbol, or limit (up to 250) for more.",
     inputSchema: {
       symbol: z.string().optional().describe("string, optional base asset, e.g. BTC"),
       history_days: z.number().int().min(1).max(90).optional().describe("Return the hourly multi-venue open interest history (total, DEX share, OI-weighted funding) for this many days instead of the snapshot"),
+      limit: z.coerce.number().int().min(1).max(250).optional().describe("Optional. Venue market rows without symbol, largest open interest first (default 30)."),
     },
     annotations: READ_ONLY,
   },
@@ -976,7 +1163,16 @@ server.registerTool(
       const path = args.history_days
         ? `/api/public/venues/oi-history?days=${Math.min(90, Math.floor(args.history_days))}`
         : args.symbol ? `/api/public/venues/markets?symbol=${encodeURIComponent(args.symbol.toUpperCase())}` : "/api/public/venues/markets";
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (args.history_days || args.symbol) return ok(withProvenance(data, path));
+      /* The route lists rows by venue; the board's own ranking is open interest, then 24h volume for the rows
+       * without open interest (spot). */
+      const n = Number(args.limit ?? 30);
+      const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : -1);
+      return ok(compact(data, path, (rec, t) => {
+        const ranked = list(rec.rows).filter(isRec).sort((a, b) => num(b.open_interest_usd) - num(a.open_interest_usd) || num(b.volume_24h_usd) - num(a.volume_24h_usd));
+        rec.rows = t.head(ranked, n, "rows", "pass symbol for one coin's rows on every venue, or limit up to 250");
+      }, "rows"));
     } catch (err) {
       return fail(err);
     }
@@ -988,13 +1184,28 @@ server.registerTool(
   {
     title: "Venue lead-lag: who moves first (Coinbase, Kraken, Binance)",
     description:
-      "Call this when the user asks which exchange leads price discovery or whether spot or perp moves first. Returns per-pair daily cross-correlations of one-minute returns at lags -3..+3 and the lead asymmetry, with the share of days each venue led.",
-    inputSchema: {},
+      "Call this when the user asks which exchange leads price discovery or whether spot or perp moves first. Returns per-pair daily cross-correlations of one-minute returns at lags -3..+3 and the lead asymmetry, with the share of days each venue led. Each pair's daily rows cover the last 7 days (its summary covers the whole window); pass days (up to 30) for more.",
+    inputSchema: {
+      days: z.coerce.number().int().min(1).max(30).optional().describe("Optional. Daily rows per pair, newest kept (default 7, up to 30)."),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ days }: { days?: number }) => {
     try {
-      return ok(withProvenance(await fetchJson("/api/public/venues/lead-lag"), "/api/public/venues/lead-lag"));
+      const path = "/api/public/venues/lead-lag";
+      return ok(compact(await fetchJson(path), path, (rec, t) => {
+        const n = days ?? 7;
+        let kept = 0;
+        let total = 0;
+        rec.pairs = list(rec.pairs).map((p) => {
+          if (!isRec(p) || !Array.isArray(p.days)) return p;
+          /* Oldest day first, so the newest n are the tail. */
+          total += p.days.length;
+          kept += Math.min(p.days.length, n);
+          return p.days.length > n ? { ...p, days: p.days.slice(-n) } : p;
+        });
+        t.note("pairs[].days", kept, total, "pass days up to 30");
+      }));
     } catch (err) {
       return fail(err);
     }
@@ -1075,19 +1286,53 @@ server.registerTool(
   },
 );
 
+/* Daily series boards (macro, network): a call without days reads the route's shortest window (30 days) and keeps the
+ * newest 7 points of each series; a call with days gets the whole window it asked for. */
+async function dailySeries(route: string, days: number | undefined, key: string | undefined): Promise<ToolResult> {
+  const wanted = days && days > 0 ? Math.floor(days) : undefined;
+  const path = `${route}?days=${wanted ?? 30}`;
+  const data = await fetchJson(path);
+  /* series narrows the answer to one key, so a long window of one series fits where every series would not. */
+  const narrowed = key && isRec(data) && isRec(data.series)
+    ? (() => {
+        if (!Object.hasOwn(data.series, key)) throw new InputError(`series must be one of ${Object.keys(data.series).join(", ")}.`);
+        return { ...data, series: { [key]: data.series[key] } };
+      })()
+    : data;
+  if (wanted) return ok(withProvenance(narrowed, path));
+  return ok(compact(narrowed, path, (rec, t) => {
+    if (!isRec(rec.series)) return;
+    const POINTS = 7;
+    let kept = 0;
+    let total = 0;
+    const series: Rec = {};
+    for (const [key, points] of Object.entries(rec.series)) {
+      const all = list(points);
+      total += all.length;
+      kept += Math.min(all.length, POINTS);
+      /* Oldest date first, so the newest points are the tail. */
+      series[key] = all.length > POINTS ? all.slice(-POINTS) : points;
+    }
+    rec.series = series;
+    t.note("series.*", kept, total, "pass days (30 to 4000) for the daily series, and series for one key over a long window");
+  }));
+}
+
 server.registerTool(
   "get_macro_liquidity",
   {
     title: "Macro liquidity: Fed funds, 10y, balance sheet, RRP, stablecoin supply",
     description:
-      "Call this when the user asks about macro liquidity, the Fed balance sheet, reverse repo, rates or stablecoin supply in relation to crypto. Returns the recorded daily series and latest values.",
-    inputSchema: { days: z.number().int().min(30).max(4000).optional().describe("Window in days, 30-4000 (default 365); the route clamps to that range.") },
+      "Call this when the user asks about macro liquidity, the Fed balance sheet, reverse repo, rates or stablecoin supply in relation to crypto. Returns the recorded daily series and latest values. Without days, each series holds its newest 7 points; pass days for the daily series, and series for one key over a long window.",
+    inputSchema: {
+      days: z.number().int().min(30).max(4000).optional().describe("Window in days, 30-4000; the route clamps to that range. Omit for the newest 7 points of each series."),
+      series: z.string().trim().regex(/^[a-z0-9_]{2,60}$/).optional().describe("Optional. One series key from the answer's series field, e.g. fred_walcl_busd."),
+    },
     annotations: READ_ONLY,
   },
   async (args) => {
     try {
-      const path = `/api/public/macro?days=${args.days && args.days > 0 ? Math.floor(args.days) : 365}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      return await dailySeries("/api/public/macro", args.days, args.series);
     } catch (err) {
       return fail(err);
     }
@@ -1099,14 +1344,16 @@ server.registerTool(
   {
     title: "Bitcoin network health from our own node",
     description:
-      "Call this when the user asks about Bitcoin hashrate, difficulty or block fees (our node runs blocksonly, so there is no mempool series). Returns the recorded daily series and latest values measured on ByKaranteli's own node.",
-    inputSchema: { days: z.number().int().min(30).max(4000).optional().describe("Window in days, 30-4000 (default 365); the route clamps to that range.") },
+      "Call this when the user asks about Bitcoin hashrate, difficulty or block fees (our node runs blocksonly, so there is no mempool series). Returns the recorded daily series and latest values measured on ByKaranteli's own node. Without days, each series holds its newest 7 points; pass days for the daily series, and series for one key over a long window.",
+    inputSchema: {
+      days: z.number().int().min(30).max(4000).optional().describe("Window in days, 30-4000; the route clamps to that range. Omit for the newest 7 points of each series."),
+      series: z.string().trim().regex(/^[a-z0-9_]{2,60}$/).optional().describe("Optional. One series key from the answer's series field, e.g. btc_hashrate_ehs."),
+    },
     annotations: READ_ONLY,
   },
   async (args) => {
     try {
-      const path = `/api/public/network?days=${args.days && args.days > 0 ? Math.floor(args.days) : 365}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      return await dailySeries("/api/public/network", args.days, args.series);
     } catch (err) {
       return fail(err);
     }
@@ -1118,7 +1365,7 @@ server.registerTool(
   {
     title: "LiqMap: estimated liquidation clusters with real prints overlaid",
     description:
-      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). Without an account key (or on the Free plan) the 24h view; with a Builder or higher key (BYKARANTELI_API_KEY) every timeframe from 1h to 30d.",
+      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). Without an account key (or on the Free plan) the 24h view; with a Builder or higher key (BYKARANTELI_API_KEY) every timeframe from 1h to 30d. By default the 30 real levels nearest the price and the 30 newest real prints; pass detail=true for all of them.",
     inputSchema: {
       symbol: z
         .string()
@@ -1131,17 +1378,34 @@ server.registerTool(
         .enum(["1h", "4h", "12h", "24h", "3d", "1w", "30d"])
         .optional()
         .describe("Model window. Default 24h, the only one served without a Builder or higher key."),
+      detail: z.boolean().optional().describe("Optional. true: every real level and every real print (default false: the 30 nearest levels, the 30 newest prints)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol, timeframe }: { symbol?: string; timeframe?: string }) => {
+  async ({ symbol, timeframe, detail }: { symbol?: string; timeframe?: string; detail?: boolean }) => {
     try {
       const raw = symbol ?? "BTCUSDT";
       const sym = raw.endsWith("USDT") ? raw : `${raw}USDT`;
       const path = `/api/liqmap/public?symbol=${encodeURIComponent(sym)}&timeframe=${encodeURIComponent(timeframe ?? "24h")}`;
       const data = await fetchJson(path);
       const page = `/liqmap/${sym.replace(/USDT$/, "").toLowerCase()}`;
-      return ok({ ...(data as Record<string, unknown>), source: `${PUBLIC_URL}${page}`, provenance: provenanceFor(data, path, page) });
+      const full = { ...(data as Record<string, unknown>), source: `${PUBLIC_URL}${page}`, provenance: provenanceFor(data, path, page) };
+      if (detail) return ok(full);
+      const N = 30;
+      return ok(trimmedAnswer(full, (rec, t) => {
+        if (isRec(rec.real_levels) && Array.isArray(rec.real_levels.levels) && rec.real_levels.levels.length > N) {
+          /* The levels nearest the price, kept in the route's price order. */
+          const levels = rec.real_levels.levels as unknown[];
+          const dist = (l: unknown) => (isRec(l) && typeof l.distance_pct === "number" ? Math.abs(l.distance_pct) : Infinity);
+          const nearest = new Set([...levels].sort((a, b) => dist(a) - dist(b)).slice(0, N));
+          rec.real_levels = { ...rec.real_levels, levels: levels.filter((l) => nearest.has(l)) };
+          t.note("real_levels.levels", N, levels.length, "pass detail=true for every level");
+        }
+        if (isRec(rec.real_liquidations)) {
+          /* Newest print first. */
+          rec.real_liquidations = { ...rec.real_liquidations, points: t.head(rec.real_liquidations.points, N, "real_liquidations.points", "pass detail=true for every print") };
+        }
+      }));
     } catch (err) {
       return fail(err);
     }
@@ -1153,7 +1417,7 @@ server.registerTool(
   {
     title: "TradFi perpetuals: stock, index and commodity perps on Binance",
     description:
-      "Call this when the user asks about stock perpetuals (TSLA, NVDA, AAPL, gold, S&P 500...), tokenized-equity perps, TradFi perp funding rates, open interest, liquidations, which exchanges list a stock perp, or whether the equity session is open. Returns Binance's TradFi perpetual board: per contract mark, index, basis, funding, 24h change and volume, open interest, 24h recorded liquidations, other venues listing the same underlying, and the trading-session state per market. Filter by market (EQUITY, HK_EQUITY, KR_EQUITY, CN_EQUITY, COMMODITY, INDEX, PREMARKET) or one symbol.",
+      "Call this when the user asks about stock perpetuals (TSLA, NVDA, AAPL, gold, S&P 500...), tokenized-equity perps, TradFi perp funding rates, open interest, liquidations, which exchanges list a stock perp, or whether the equity session is open. Returns Binance's TradFi perpetual board: per contract mark, index, basis, funding, 24h change and volume, open interest, 24h recorded liquidations, other venues listing the same underlying, and the trading-session state per market. Filter by market (EQUITY, HK_EQUITY, KR_EQUITY, CN_EQUITY, COMMODITY, INDEX, PREMARKET) or one symbol. Without symbol, the first 30 contracts by open interest; pass symbol, or limit (up to 150) for more.",
     inputSchema: {
       market: z
         .string()
@@ -1169,17 +1433,22 @@ server.registerTool(
         .regex(/^[A-Z0-9]{2,24}$/)
         .optional()
         .describe("One Binance TradFi symbol, e.g. TSLAUSDT"),
+      limit: z.coerce.number().int().min(1).max(150).optional().describe("Optional. Contracts without symbol, largest open interest first (default 30)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ market, symbol }: { market?: string; symbol?: string }) => {
+  async ({ market, symbol, limit }: { market?: string; symbol?: string; limit?: number }) => {
     try {
       const params = new URLSearchParams();
       if (market) params.set("market", market);
       if (symbol) params.set("symbol", symbol);
       const qs = params.toString();
       const path = `/api/public/tradfi${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (symbol) return ok(withProvenance(data, path));
+      return ok(compact(data, path, (rec, t) => {
+        rec.rows = t.head(rec.rows, limit ?? 30, "rows", "pass symbol, market, or limit up to 150");
+      }, "rows"));
     } catch (err) {
       return fail(err);
     }
@@ -1191,15 +1460,17 @@ server.registerTool(
   {
     title: "RSI heatmap: Wilder RSI(14) on eight timeframes for the top-400 crypto perps and every TradFi perp",
     description:
-      "Call this when the user asks which coins are overbought or oversold, for a crypto RSI heatmap, multi-timeframe RSI, or one contract's RSI on 15m, 1h, 4h, 12h, 1d, 3d, 1w or 1M. Returns the live board for the top-400 Binance crypto perps by volume plus every TradFi perp, with overbought/oversold counts per interval. Filter by symbol or kind (crypto|tradfi), sort by an interval.",
+      "Call this when the user asks which coins are overbought or oversold, for a crypto RSI heatmap, multi-timeframe RSI, or one contract's RSI on 15m, 1h, 4h, 12h, 1d, 3d, 1w or 1M. Returns the live board for the top-400 Binance crypto perps by volume plus every TradFi perp, with overbought/oversold counts per interval. Filter by symbol or kind (crypto|tradfi), sort by an interval. Without symbol, the first 30 rows (by volume, or by the sort interval); pass limit (up to 400) for more, or order asc with sort for the most oversold first.",
     inputSchema: {
       symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,24}$/).optional().describe("One Binance symbol, e.g. BTCUSDT"),
       kind: z.enum(["crypto", "tradfi"]).optional().describe("crypto | tradfi"),
       sort: z.enum(["15m", "1h", "4h", "12h", "1d", "3d", "1w", "1M"]).optional().describe("Interval to sort by, descending"),
+      order: z.enum(["desc", "asc"]).optional().describe("Optional. With sort: desc (default, most overbought first) or asc (most oversold first)."),
+      limit: z.coerce.number().int().min(1).max(400).optional().describe("Optional. Rows without symbol (default 30)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol, kind, sort }: { symbol?: string; kind?: string; sort?: string }) => {
+  async ({ symbol, kind, sort, order, limit }: { symbol?: string; kind?: string; sort?: string; order?: "desc" | "asc"; limit?: number }) => {
     try {
       const params = new URLSearchParams();
       if (symbol) params.set("symbol", symbol);
@@ -1207,7 +1478,17 @@ server.registerTool(
       if (sort) params.set("sort", sort);
       const qs = params.toString();
       const path = `/api/public/rsi${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (symbol) return ok(withProvenance(data, path));
+      return ok(compact(data, path, (rec, t) => {
+        let rows = list(rec.rows);
+        if (sort && order === "asc") {
+          /* The route sorts descending; reversed, rows without a reading on that interval stay last. */
+          const has = (r: unknown) => isRec(r) && isRec(r.rsi) && typeof r.rsi[sort] === "number";
+          rows = [...rows.filter(has).reverse(), ...rows.filter((r) => !has(r))];
+        }
+        rec.rows = t.head(rows, limit ?? 30, "rows", "pass symbol, kind, or limit up to 400 (with sort and order asc for the lowest readings)");
+      }, "rows"));
     } catch (err) {
       return fail(err);
     }
@@ -1241,21 +1522,27 @@ server.registerTool(
   {
     title: "Hyperliquid whale tracker: top-300 accounts, long vs short, positions, changes",
     description:
-      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the 300 largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes.",
+      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the 300 largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes. Without coin, the 30 largest coins and positions; pass coin, or limit (up to 200) for more.",
     inputSchema: {
       coin: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,24}$/).optional().describe("One coin, e.g. BTC"),
       events: z.boolean().optional().describe("Include the last 200 position change events"),
+      limit: z.coerce.number().int().min(1).max(200).optional().describe("Optional. Coins and positions without coin, largest first (default 30)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ coin, events }: { coin?: string; events?: boolean }) => {
+  async ({ coin, events, limit }: { coin?: string; events?: boolean; limit?: number }) => {
     try {
       const params = new URLSearchParams();
       if (coin) params.set("coin", coin);
       if (events) params.set("events", "1");
       const qs = params.toString();
       const path = `/api/public/hyperliquid-whales${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (coin) return ok(withProvenance(data, path));
+      return ok(compact(data, path, (rec, t) => {
+        rec.by_coin = t.head(rec.by_coin, limit ?? 30, "by_coin", "pass coin, or limit up to 200");
+        rec.positions = t.head(rec.positions, limit ?? 30, "positions", "pass coin, or limit up to 200");
+      }, "positions"));
     } catch (err) {
       return fail(err);
     }
@@ -1267,16 +1554,45 @@ server.registerTool(
   {
     title: "Positioning: long/short ratios, taker buy/sell and CVD across exchanges",
     description:
-      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps on every perpetual venue the positioning board records (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume, Gate account and top-trader ratios, HTX elite ratios, Bitget account and position ratios) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes.",
+      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps on every perpetual venue the positioning board records (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume, Gate account and top-trader ratios, HTX elite ratios, Bitget account and position ratios) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes. Without symbol, the 10 most traded perps and the newest 24 points of each CVD series; pass symbol, limit or cvd_points for more.",
     inputSchema: {
       symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,24}$/).optional().describe("One Binance symbol, e.g. BTCUSDT"),
+      limit: z.coerce.number().int().min(1).max(30).optional().describe("Optional. Perps without symbol, most traded first (default 10, up to 30)."),
+      cvd_points: z.coerce.number().int().min(1).max(288).optional().describe("Optional. Newest points per CVD series (1h and 5m); default 24 without symbol, every point with one."),
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol }: { symbol?: string }) => {
+  async ({ symbol, limit, cvd_points }: { symbol?: string; limit?: number; cvd_points?: number }) => {
     try {
       const path = `/api/public/positioning${symbol ? `?symbol=${encodeURIComponent(symbol)}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      const points = cvd_points ?? (symbol ? undefined : 24);
+      if (symbol && points === undefined) return ok(withProvenance(data, path));
+      return ok(compact(data, path, (rec, t) => {
+        if (!symbol) rec.rows = t.head(rec.rows, limit ?? 10, "rows", "pass symbol, or limit up to 30");
+        if (points !== undefined && isRec(rec.cvd)) {
+          const kept: Record<string, number> = {};
+          const total: Record<string, number> = {};
+          const cvd: Rec = {};
+          for (const [sym, intervals] of Object.entries(rec.cvd)) {
+            if (!isRec(intervals)) {
+              cvd[sym] = intervals;
+              continue;
+            }
+            const out: Rec = {};
+            for (const [interval, series] of Object.entries(intervals)) {
+              const all = list(series);
+              total[interval] = (total[interval] ?? 0) + all.length;
+              kept[interval] = (kept[interval] ?? 0) + Math.min(all.length, points);
+              /* Oldest point first, so the newest are the tail. */
+              out[interval] = all.length > points ? all.slice(-points) : series;
+            }
+            cvd[sym] = out;
+          }
+          rec.cvd = cvd;
+          for (const interval of Object.keys(total)) t.note(`cvd.*.${interval}`, kept[interval], total[interval], "pass symbol for its full CVD, or cvd_points up to 288");
+        }
+      }, symbol ? undefined : "rows"));
     } catch (err) {
       return fail(err);
     }
@@ -1288,21 +1604,31 @@ server.registerTool(
   {
     title: "Turkey Premium Index: what lira buyers pay above the world price, with TRY reference prices from Turkish venues",
     description:
-      "Call this when the user asks about Bitcoin, Ether or USDT prices in Turkish lira, the Turkey premium, the USDT/TRY rate or dollar premium in Turkey, or which Turkish exchanges (BtcTurk, Bitlo, CoinTR, OKX TR, Binance TR, Bybit TR, Bitexen; KuCoin TR contributes the USDT pairs only) trade above or below the global price. Returns the live board: the Turkey Premium Index (what a lira buyer pays for bitcoin against the global dollar price at the official exchange rate, in bps) with its dollar leg and crypto leg, a 0-100 score (50 = world price) and regime, 24h and 7d averages and the same-sign streak; then five reference prices (median of eligible order books), per-venue book status, spread, depth and each venue's implied premium. Pass pair and history_days for 15-minute history of one pair.",
+      "Call this when the user asks about Bitcoin, Ether or USDT prices in Turkish lira, the Turkey premium, the USDT/TRY rate or dollar premium in Turkey, or which Turkish exchanges (BtcTurk, Bitlo, CoinTR, OKX TR, Binance TR, Bybit TR, Bitexen; KuCoin TR contributes the USDT pairs only) trade above or below the global price. Returns the live board: the Turkey Premium Index (what a lira buyer pays for bitcoin against the global dollar price at the official exchange rate, in bps) with its dollar leg and crypto leg, a 0-100 score (50 = world price) and regime, 24h and 7d averages and the same-sign streak; then five reference prices (median of eligible order books), per-venue book status, spread, depth and each venue's implied premium. Pass pair and history_days for 15-minute history of one pair. Without pair, the daily rows cover the last 7 days; pass pair, or daily_days (up to 30) for more.",
     inputSchema: {
       pair: z.string().trim().toUpperCase().regex(/^(BTC-TRY|ETH-TRY|USDT-TRY|BTC-USDT|ETH-USDT)$/).optional().describe("Pair: BTC-TRY, ETH-TRY, USDT-TRY, BTC-USDT or ETH-USDT"),
       history_days: z.number().int().min(1).max(30).optional().describe("Include 15-minute index history for the pair, 1..30 days"),
+      daily_days: z.coerce.number().int().min(1).max(30).optional().describe("Optional. Days of daily rows, newest first (default 7 without pair, every recorded day with one)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ pair, history_days }: { pair?: string; history_days?: number }) => {
+  async ({ pair, history_days, daily_days }: { pair?: string; history_days?: number; daily_days?: number }) => {
     try {
       const q = new URLSearchParams();
       if (pair) q.set("pair", pair);
       if (history_days) q.set("days", String(history_days));
       const qs = q.toString();
       const path = `/api/public/turkey-premium${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      const wantDays = daily_days ?? (pair ? undefined : 7);
+      if (wantDays === undefined) return ok(withProvenance(data, path));
+      return ok(compact(data, path, (rec, t) => {
+        const daily = list(rec.daily);
+        const keep = newestDates(daily, wantDays);
+        const kept = daily.filter((r) => isRec(r) && keep.has(String(r.date)));
+        t.note("daily", kept.length, daily.length, "pass pair, or daily_days up to 30");
+        rec.daily = kept;
+      }));
     } catch (err) {
       return fail(err);
     }
@@ -1476,21 +1802,28 @@ server.registerTool(
   {
     title: "Weekend and overnight gaps: stock, index and commodity perpetuals against the cash close, checkpoint by checkpoint",
     description:
-      "Call this when the user asks what a stock, index or commodity perpetual did over the weekend or overnight while the cash market was closed, how far it sat from the last cash close at each checkpoint, how the venues disagreed, and what gap the next open then realised. From ByKaranteli's own ten-minute venue record; window weekend or night; one symbol or the whole board.",
+      "Call this when the user asks what a stock, index or commodity perpetual did over the weekend or overnight while the cash market was closed, how far it sat from the last cash close at each checkpoint, how the venues disagreed, and what gap the next open then realised. From ByKaranteli's own ten-minute venue record; window weekend or night; one symbol or the whole board. Without symbol, the first 15 underlyings of the summary and of the latest window; pass symbol, or limit (up to 60) for more.",
     inputSchema: {
       window: z.enum(["weekend", "night"]).optional().describe("weekend (Friday close to Monday open) or night (cash close to next open); default weekend"),
       symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9.]{1,24}$/).optional().describe("One underlying, e.g. TSLA or XAU (default: the whole board)"),
+      limit: z.coerce.number().int().min(1).max(60).optional().describe("Optional. Underlyings without symbol, in the board's order, for the summary and the latest window (default 15, up to 60)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ window, symbol }: { window?: string, symbol?: string }) => {
+  async ({ window, symbol, limit }: { window?: string, symbol?: string, limit?: number }) => {
     try {
       const q = new URLSearchParams();
       if (window !== undefined) q.set("window", String(window));
       if (symbol !== undefined) q.set("symbol", String(symbol));
       const qs = q.toString();
       const path = `/api/public/tradfi-gaps${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (symbol !== undefined) return ok(withProvenance(data, path));
+      const n = limit ?? 15;
+      return ok(compact(data, path, (rec, t) => {
+        rec.summary = t.head(rec.summary, n, "summary", "pass symbol for every window of one underlying, or limit up to 60");
+        if (isRec(rec.latest)) rec.latest = { ...rec.latest, symbols: t.head(rec.latest.symbols, n, "latest.symbols", "pass symbol for every window of one underlying, or limit up to 60") };
+      }, "summary"));
     } catch (err) {
       return fail(err);
     }
@@ -1502,17 +1835,18 @@ server.registerTool(
   {
     title: "Solana Perps board: open interest, 24h volume and hourly rates across six Solana perpetual venues (Jupiter, Pacifica, Phoenix, GM Trade, Velocity, Bullet)",
     description:
-      "Call this when the user asks about perpetuals on Solana as a whole, which Solana perp DEX has the most open interest or volume, a market on Pacifica, Phoenix, GM Trade (GMX on Solana), Velocity (the Drift relaunch) or Bullet (funding, open interest, 24h volume, mark), or how Jupiter compares with the order-book venues. Returns the board read every 10 minutes: per-venue totals (one-sided open interest, both sides on pool venues, 24h volume, market count, median hourly rate, as_of), every market of every venue largest first with instrument type (perpetual, equity, index, commodity, fx), and optional hourly history of one market on any venue but Jupiter (7 days free, 30 with member depth; Jupiter history is get_jupiter_perps).",
+      "Call this when the user asks about perpetuals on Solana as a whole, which Solana perp DEX has the most open interest or volume, a market on Pacifica, Phoenix, GM Trade (GMX on Solana), Velocity (the Drift relaunch) or Bullet (funding, open interest, 24h volume, mark), or how Jupiter compares with the order-book venues. Returns the board read every 10 minutes: per-venue totals (one-sided open interest, both sides on pool venues, 24h volume, market count, median hourly rate, as_of), every market of every venue largest first with instrument type (perpetual, equity, index, commodity, fx), and optional hourly history of one market on any venue but Jupiter (7 days free, 30 with member depth; Jupiter history is get_jupiter_perps). Without venue, the 30 largest markets; pass venue, or limit (up to 300) for more.",
     inputSchema: {
       venue: z.string().trim().toLowerCase().regex(/^(jupiter|pacifica|phoenix|gmtrade|velocity|bullet)$/).optional().describe("Venue filter: jupiter, pacifica, phoenix, gmtrade, velocity or bullet"),
       /* Passed as typed: Pacifica and Phoenix list mixed-case markets (kBONK, kPEPE, kSHIB) and the route matches the
        symbol case-insensitively, so upper-casing here would only change what the caller sees echoed back. */
       symbol: z.string().trim().regex(/^[A-Za-z0-9_.-]{1,24}$/).optional().describe("Market symbol on the chosen venue (Pacifica when venue is not given) for hourly history, as the board lists it, e.g. SOL, SOL-PERP, SOL-USD, kBONK"),
       history_days: z.number().int().min(1).max(30).optional().describe("Hourly history for the symbol, 1..30 days"),
+      limit: z.coerce.number().int().min(1).max(300).optional().describe("Optional. Markets without venue, largest first (default 30)."),
     },
     annotations: READ_ONLY,
   },
-  async ({ venue, symbol, history_days }: { venue?: string; symbol?: string; history_days?: number }) => {
+  async ({ venue, symbol, history_days, limit }: { venue?: string; symbol?: string; history_days?: number; limit?: number }) => {
     try {
       const q = new URLSearchParams();
       if (venue) q.set("venue", venue);
@@ -1520,7 +1854,11 @@ server.registerTool(
       if (history_days) q.set("days", String(history_days));
       const qs = q.toString();
       const path = `/api/public/solana-perps${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (venue) return ok(withProvenance(data, path));
+      return ok(compact(data, path, (rec, t) => {
+        rec.markets = t.head(rec.markets, limit ?? 30, "markets", "pass venue for every market of one venue, or limit up to 300");
+      }, "markets"));
     } catch (err) {
       return fail(err);
     }
@@ -1532,14 +1870,36 @@ server.registerTool(
   {
     title: "Coverage registry: which venues and data types we collect, how, and how fresh",
     description:
-      "Call this when the user asks which exchanges sit behind a ByKaranteli number, whether a feed is complete or sampled, since when a venue is collected, or how fresh the data is. Returns the live coverage registry: liquidation feeds per venue with kind and last record, snapshot feeds per venue and market, funding arbitrage legs, positioning sources, whale tape, spot minutes and the Hyperliquid whale scan with freshness. snapshots[].country is the jurisdiction only when the venue states one; it is null for most venues, so do not read null as unknown risk.",
-    inputSchema: {},
+      "Call this when the user asks which exchanges sit behind a ByKaranteli number, whether a feed is complete or sampled, since when a venue is collected, or how fresh the data is. Returns the live coverage registry: liquidation feeds per venue with kind and last record, snapshot feeds per venue and market, funding arbitrage legs, positioning sources, whale tape, spot minutes and the Hyperliquid whale scan with freshness. snapshots[].country is the jurisdiction only when the venue states one; it is null for most venues, so do not read null as unknown risk. By default the first 30 snapshot feeds, English notes only and no per-venue matrix cells; pass detail=true for the full registry.",
+    inputSchema: {
+      detail: z.boolean().optional().describe("Optional. true: every snapshot feed, the zh, ru and ko notes and the venue by product matrix cells (default false)."),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ detail }: { detail?: boolean }) => {
     try {
       const path = "/api/public/coverage";
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (detail) return ok(withProvenance(data, path));
+      const more = "pass detail=true for the full registry";
+      return ok(compact(data, path, (rec, t) => {
+        rec.snapshots = t.head(rec.snapshots, 30, "snapshots", more);
+        const liq = list(rec.liquidations);
+        let translated = 0;
+        rec.liquidations = liq.map((r) => {
+          if (!isRec(r)) return r;
+          /* note_en stays; the zh, ru and ko notes translate it for the site's other locales. */
+          const { note_zh, note_ru, note_ko, ...rest } = r;
+          if (note_zh !== undefined || note_ru !== undefined || note_ko !== undefined) translated += 1;
+          return rest;
+        });
+        t.note("liquidations[].note_zh, note_ru, note_ko", 0, translated, more);
+        if (isRec(rec.matrix) && isRec(rec.matrix.cells)) {
+          const products = Object.keys(rec.matrix.cells).length;
+          rec.matrix = { ...rec.matrix, cells: {} };
+          t.note("matrix.cells", 0, products, `${more}; matrix.products already lists each product's venues`);
+        }
+      }));
     } catch (err) {
       return fail(err);
     }

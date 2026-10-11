@@ -2,6 +2,20 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.35.0] - 2026-10-11
+
+67 tools.
+
+### Changed
+
+- Short default answers. Twenty market tools answered between 48,000 and 234,000 characters on a call without arguments, and `get_venue_markets` answered nothing but the ceiling note. A call without the detail parameters now returns a first page: every shortened list is named in `trimmed` (`field`, `returned`, `total` and `more`, the parameter that returns the rest), and a shortened main list carries `rows_total` and `rows_returned`. Items are kept or left out as the route sent them; nothing is recomputed, field names stay, and `provenance` still describes the full route answer. Filtered calls (one symbol, coin, asset, pair, underlying or venue) keep their full detail.
+- The result ceiling is 100,000 characters (was 240,000), under the 25,000 tokens Claude Code allows one tool result by default.
+- Defaults per tool: `get_tradfi_gaps` 15 underlyings in the summary and the latest window; `get_borrow_rates` the last 24 hours of each series; `get_positioning` the 10 most traded perps and 24 points per CVD series; `get_macro_liquidity` and `get_network_health` the newest 7 points of each series; `get_tradfi_board`, `get_rsi_heatmap`, `get_solana_perps`, `get_hl_whales`, `get_settlements`, `get_withdrawal_status` and `get_leverage_tiers` 30 rows per list (`get_leverage_tiers` also the first 5 tiers of each ladder); `get_venue_markets` the 30 venue markets with the largest open interest; `get_liquidations` 30 rows without a symbol (summary still covers every matching row); `get_tokenized_stocks` 10 stocks (was 20) with their first 3 wrappers and 3 exchange pairs; `get_coverage` the first 30 snapshot feeds, English notes only and no matrix cells; `get_coinbase_premium` and `get_turkey_premium` the last 7 days of daily rows; `get_funding_arbitrage` the first 5 venue legs per row; `get_liqmap` the 30 real levels nearest the price and the 30 newest real prints; `get_lead_lag` the last 7 daily rows per pair.
+
+### Added
+
+- Parameters that return the detail: `limit` on `get_liquidations`, `get_tradfi_gaps`, `get_positioning`, `get_tradfi_board`, `get_leverage_tiers`, `get_rsi_heatmap`, `get_settlements`, `get_hl_whales`, `get_solana_perps`, `get_withdrawal_status` and `get_venue_markets`; `asset` and `hours` on `get_borrow_rates`; `cvd_points` on `get_positioning`; `series` on `get_macro_liquidity` and `get_network_health` (one key over a long window); `order` (asc with `sort`, most oversold first) on `get_rsi_heatmap`; `base` on `get_settlements`; `symbol` on `get_funding_arbitrage`; `days` on `get_coinbase_premium` and `get_lead_lag`; `daily_days` on `get_turkey_premium`; `detail` on `get_coverage` and `get_liqmap`.
+
 ## [0.34.6] - 2026-10-09
 
 67 tools. README only; the server code is the same as 0.34.3.

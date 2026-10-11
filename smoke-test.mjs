@@ -87,6 +87,9 @@ const REQUIRED_ARGS = {
   get_series: { metric: "oi", symbol: "BTC", period: "1h", limit: 24 },
   parse_alert_text: { text: "BTC funding above 0.05%" },
 };
+/* 0.35.0: a default call is a short first page. Claude Code caps one tool result at 25,000 tokens by default, and
+ * the Connectors Directory asks for answers sized to the task; detail comes through each tool's own parameters. */
+const DEFAULT_MAX_CHARS = 40_000;
 for (const toolName of names) {
   if (WRITE_TOOLS.has(toolName)) continue;
   if (ACCOUNT_READ_TOOLS.has(toolName) && !HAS_KEY) {
@@ -95,6 +98,9 @@ for (const toolName of names) {
   }
   const r = await callAll(toolName, REQUIRED_ARGS[toolName] ?? {});
   check(`call ${toolName}`, !r.isError, r.isError ? r.text.slice(0, 100).replace(/\n/g, " ") : "");
+  if (!r.isError) {
+    check(`default size ${toolName}`, r.text.length <= DEFAULT_MAX_CHARS && !r.text.startsWith('{"truncated":true'), `${r.text.length} chars`);
+  }
 }
 async function callAll(name, args) {
   const r = await rpc("tools/call", { name, arguments: args });
@@ -154,7 +160,20 @@ const strWin = await call("get_liquidations", { symbol: "ETH", window_days: "3" 
 check("string window_days coerced", !strWin.isError && strWin.text.includes("window_days"), "");
 
 const arb = await call("get_funding_arbitrage");
-check("get_funding_arbitrage", !arb.isError && arb.text.includes("netApr"), "");
+check("get_funding_arbitrage", !arb.isError && arb.text.includes("netApr") && arb.text.includes('"trimmed"'), "");
+const arbOne = await call("get_funding_arbitrage", { symbol: "BTC" });
+const arbRows = arbOne.isError ? [] : JSON.parse(arbOne.text).rows ?? [];
+check("get_funding_arbitrage(BTC) every leg", arbRows.length === 1 && arbRows[0].symbol === "BTCUSDT" && (arbRows[0].exchanges ?? []).length > 5, `legs=${arbRows[0]?.exchanges?.length}`);
+
+const venues = await call("get_venue_markets");
+const venuesBody = venues.isError ? {} : JSON.parse(venues.text);
+check(
+  "get_venue_markets default returns data with trimmed",
+  !venues.isError && !venuesBody.truncated && (venuesBody.rows ?? []).length === 30 && venuesBody.rows_total > 30 && Array.isArray(venuesBody.trimmed),
+  `rows=${venuesBody.rows?.length} of ${venuesBody.rows_total}`,
+);
+const venuesMore = await call("get_venue_markets", { limit: 60 });
+check("get_venue_markets(limit=60)", !venuesMore.isError && (JSON.parse(venuesMore.text).rows ?? []).length === 60, "");
 
 const movers = await call("get_top_movers");
 check("get_top_movers", !movers.isError && movers.text.includes("biggestOi24h"), "");

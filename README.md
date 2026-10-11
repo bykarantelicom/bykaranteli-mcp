@@ -124,6 +124,8 @@ Requires Node.js 18 or newer.
 
 All market answers are JSON and carry a `generatedAt` timestamp, a `source` URL to the human-readable page and a `provenance` block: `source_page`, `api_path`, the answer's own `generated_at`, `fetched_at`, and when the answer carries them the `venues` behind the number, `coverage` (`full`, `sampled` or `mixed`), `stale_venues` and `recorded_since`, plus the `proof` page (<https://bykaranteli.com/proof>). A field the answer does not carry is left out, never filled in. Symbols accept both `BTCUSDT` and bare `BTC`.
 
+Answers are sized for a model's context: a call without arguments returns a short first page (for example 30 rows, or the newest points of a series), never a whole board. Every shortened list is named in `trimmed` with `field`, `returned`, `total` and `more`, the parameter that returns the rest (`symbol`, `coin`, `asset`, `limit`, `days`, `detail` and the like); a filtered call keeps its full detail. One answer is capped at 100,000 characters; above that the tool says how to narrow the call.
+
 ## Account tools (alerts and watchlist)
 
 These tools read and change your own ByKaranteli account with the same key: the alert recipes that notify you on Telegram, email, push or webhook, and your watchlists. They never trade, move funds or touch another account.
