@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.36.0] - 2026-10-15
+
+68 tools.
+
+### Added
+
+- `get_desk_notes`: the desk notes, short dated observations the ByKaranteli desk writer publishes from the platform's own recorded derivatives data, newest first, with publish time, news value, the board each reads from, the coins it names and a permanent URL; one UTC day (`day`), a window of up to 7 days (`since`), one card type (`type`), the text in zh, ru or ko (`lang`).
+
 ## [0.35.1] - 2026-10-11
 
 67 tools.

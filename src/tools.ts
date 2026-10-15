@@ -1625,6 +1625,38 @@ server.registerTool(
 );
 
 server.registerTool(
+  "get_desk_notes",
+  {
+    title: "Desk notes: short dated observations the ByKaranteli desk wrote from its own recorded derivatives data",
+    description:
+      "Call this when the user asks what happened in crypto derivatives today or on a date, what the desk observed, what moved in funding, open interest, liquidations, options, ETF flows or exchange premiums, or wants a dated, quotable sentence with its number and time. Returns the desk's notes newest first: each is one observation written by the desk writer (an AI model) from the platform's own recorded data and checked against it before publishing, with its publish time in UTC, the card's data time, the desk's 0 to 10 news value, the board it read from, the coins it names and its permanent URL. Information about the data, never advice. Default the last 24 hours; pass day for one UTC day, since for a window up to 7 days back, type for one card type (funding-arb, liqmap-btc, event-liq-burst, ...), lang for zh, ru or ko text.",
+    inputSchema: {
+      day: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("One UTC day, YYYY-MM-DD"),
+      since: z.string().trim().max(40).optional().describe("ISO time; notes published at or after it, at most 7 days back (ignored with day)"),
+      type: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{0,60}$/).optional().describe("One card type, e.g. funding-arb, liqmap-btc, event-liq-burst"),
+      lang: z.enum(["en", "zh", "ru", "ko"]).optional().describe("Text language (default en); a note without that translation comes back in English"),
+      limit: z.number().int().min(1).max(100).optional().describe("Notes to return, 1..100 (default 50)"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ day, since, type, lang, limit }: { day?: string; since?: string; type?: string; lang?: string; limit?: number }) => {
+    try {
+      const q = new URLSearchParams();
+      if (day) q.set("day", day);
+      else if (since) q.set("since", since);
+      if (type) q.set("type", type);
+      if (lang && lang !== "en") q.set("lang", lang);
+      if (limit) q.set("limit", String(limit));
+      const qs = q.toString();
+      const path = `/api/public/desk${qs ? `?${qs}` : ""}`;
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
   "get_turkey_premium",
   {
     title: "Turkey Premium Index: what lira buyers pay above the world price, with TRY reference prices from Turkish venues",
