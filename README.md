@@ -148,6 +148,7 @@ These tools read and change your own ByKaranteli account with the same key: the 
 - How many recipes an account keeps follows its plan; past it, `create_alert_recipe` answers with the limit instead of saving.
 - Every call counts on the key's plan like any other request; writes are also rate limited per key, and each write is recorded on the account with the key that made it.
 - Recipes and watchlist changes show up at once on <https://bykaranteli.com/dashboard/alerts> and <https://bykaranteli.com/dashboard/watchlist>.
+- If a tool call answers 401, the body's `error_description` says what to send and the `x-byk-mcp-auth` header names the cause: `key_required` (no credential at all), `key_unusable` (a header or the address carried no key: the `bk_...` placeholder, an unset variable, a non-Bearer scheme, an OAuth token of the wrong shape), `key_wrong_type` (a prepaid `bk_live_` key, which pays per call on /api/x402/* and does not open the MCP) or `key_unrecognised` (mistyped, expired or revoked). The `WWW-Authenticate` challenge starts the OAuth sign-in in clients that support it. This package forwards the REST body verbatim, so the same sentence reaches the model over stdio.
 
 ## Configuration
 

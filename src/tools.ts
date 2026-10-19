@@ -2,7 +2,7 @@
  * Tool registrations for the ByKaranteli MCP server, transport-agnostic.
  * The stdio bin (index.ts) and the hosted Streamable HTTP endpoint on
  * bykaranteli.com both call registerByKaranteliTools on their own server
- * instance, so all 20 tools have exactly one definition.
+ * instance, so every tool has exactly one definition.
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -2150,7 +2150,7 @@ server.registerTool("parse_alert_text", {
 
 server.registerTool("list_alert_recipes", {
   title: "Your alert recipes: every alert on your account with its conditions, scope, channels and when it last fired",
-  description: "Call this when the user asks which alerts they have, whether an alert fired, or before deleting or changing one. Returns the account's alert recipes (id, name, scope, symbols, conditions, cooldown in hours, enabled, last fired, fire count, channels). Needs a signed-in account (OAuth sign-in or account key); reads nothing but this account.",
+  description: "Call this when the user asks which alerts they have, whether an alert fired, or before deleting or changing one. Returns the account's alert recipes (id, name, scope, symbols, conditions, cooldown in hours, enabled, last fired, fire count, channels, reachable: whether a delivery channel is set up for it) and channels_available (the delivery channels the account has connected). Needs a signed-in account (OAuth sign-in or account key); reads nothing but this account.",
   inputSchema: {},
   annotations: ACCOUNT_READ,
 }, async () => {
