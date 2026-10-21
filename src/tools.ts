@@ -948,13 +948,19 @@ server.registerTool(
   {
     title: "Factor board: what followed days like today across recorded metrics",
     description:
-      "Call this when the user asks which indicators currently sit in an unusual band, whether a metric's current level historically preceded BTC moves, or for a cross-metric conditional overview. Returns every recorded metric in its historical band with the median 7-day BTC move that followed versus the base rate, with an n >= 30 gate; distributions, not forecasts.",
-    inputSchema: {},
+      "Call this when the user asks which indicators currently sit in an unusual band, whether a metric's current level historically preceded BTC moves, or for a cross-metric conditional overview. Returns every recorded metric in its historical band with the median 7-day BTC move that followed versus the base rate, with an n >= 30 gate; distributions, not forecasts. Without limit the first 40 rows in the board's own order (rows_total counts every row, trimmed names the cut); pass limit up to 400 for the whole board.",
+    inputSchema: {
+      limit: z.coerce.number().int().min(1).max(400).optional().describe("Optional. Rows to return, 1..400 (default 40)"),
+    },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ limit }: { limit?: number }) => {
     try {
-      return ok(withProvenance(await fetchJson("/api/public/factors"), "/api/public/factors"));
+      /* 0.36.1: 79 rows of about 600 characters answered 46,000 characters without arguments; a first page of 40. */
+      const n = limit ?? 40;
+      return ok(compact(await fetchJson("/api/public/factors"), "/api/public/factors", (rec, t) => {
+        rec.rows = t.head(rec.rows, n, "rows", "pass limit up to 400");
+      }, "rows"));
     } catch (err) {
       return fail(err);
     }
@@ -1629,13 +1635,13 @@ server.registerTool(
   {
     title: "Desk notes: short dated observations the ByKaranteli desk wrote from its own recorded derivatives data",
     description:
-      "Call this when the user asks what happened in crypto derivatives today or on a date, what the desk observed, what moved in funding, open interest, liquidations, options, ETF flows or exchange premiums, or wants a dated, quotable sentence with its number and time. Returns the desk's notes newest first: each is one observation written by the desk writer (an AI model) from the platform's own recorded data and checked against it before publishing, with its publish time in UTC, the card's data time, the desk's 0 to 10 news value, the board it read from, the coins it names and its permanent URL. Information about the data, never advice. Default the last 24 hours; pass day for one UTC day, since for a window up to 7 days back, type for one card type (funding-arb, liqmap-btc, event-liq-burst, ...), lang for zh, ru or ko text.",
+      "Call this when the user asks what happened in crypto derivatives today or on a date, what the desk observed, what moved in funding, open interest, liquidations, options, ETF flows or exchange premiums, or wants a dated, quotable sentence with its number and time. Returns the desk's notes newest first: each is one observation written by the desk writer (an AI model) from the platform's own recorded data and checked against it before publishing, with its publish time in UTC, the card's data time, the desk's 0 to 10 news value, the board it read from, the coins it names and its permanent URL. Information about the data, never advice. Default the newest 25 notes of the last 24 hours (count says how many came back; limit up to 100 for more); pass day for one UTC day, since for a window up to 7 days back (50 notes unless limit says otherwise), type for one card type (funding-arb, liqmap-btc, event-liq-burst, ...), lang for zh, ru or ko text.",
     inputSchema: {
       day: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("One UTC day, YYYY-MM-DD"),
       since: z.string().trim().max(40).optional().describe("ISO time; notes published at or after it, at most 7 days back (ignored with day)"),
       type: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{0,60}$/).optional().describe("One card type, e.g. funding-arb, liqmap-btc, event-liq-burst"),
       lang: z.enum(["en", "zh", "ru", "ko"]).optional().describe("Text language (default en); a note without that translation comes back in English"),
-      limit: z.number().int().min(1).max(100).optional().describe("Notes to return, 1..100 (default 50)"),
+      limit: z.number().int().min(1).max(100).optional().describe("Notes to return, 1..100 (default 25 for the last 24 hours, 50 with day or since)"),
     },
     annotations: READ_ONLY,
   },
@@ -1646,7 +1652,9 @@ server.registerTool(
       else if (since) q.set("since", since);
       if (type) q.set("type", type);
       if (lang && lang !== "en") q.set("lang", lang);
+      /* 0.36.1: a day of forty notes answered 47,000 characters without arguments; the first page is 25. */
       if (limit) q.set("limit", String(limit));
+      else if (!day && !since) q.set("limit", "25");
       const qs = q.toString();
       const path = `/api/public/desk${qs ? `?${qs}` : ""}`;
       return ok(withProvenance(await fetchJson(path), path));
@@ -1998,6 +2006,9 @@ const SERIES_PERIODS = ["1m", "3m", "5m", "10m", "15m", "30m", "1h", "2h", "4h",
 type SeriesPeriod = (typeof SERIES_PERIODS)[number];
 const PERIOD_MS: Record<SeriesPeriod, number> = { "1m": 60_000, "3m": 180_000, "5m": 300_000, "10m": 600_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000, "6h": 21_600_000, "8h": 28_800_000, "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000, "1w": 604_800_000, "1M": 2_592_000_000 };
 const SERIES_MEMBER_BAR_LIMIT = 5000;
+/* The public depth of /api/series (web lib/series/limits.ts SERIES_ANON_BAR_LIMIT): the window a plan without member
+ * depth may page back through with `to`; an older `to` answers 403 history_member_only (web route, 2026-10-20). */
+const SERIES_ANON_BAR_LIMIT = 300;
 const RECIPE_FIELD_KEYS = ["mark_price", "pressure_score", "funding_rate_pct", "oi24h_pct", "basis_pct", "price_change_24h_pct", "liq_cluster_distance_pct", "usdt_peg_min_usd", "usdc_peg_min_usd", "liq_1h_usd", "rsi_4h", "ls_ratio_global", "book_imbalance_2pct_pct", "withdrawal_paused_venues", "max_leverage_min", "borrow_apr_pct", "hl_whale_long_share_pct"] as const;
 const RECIPE_OPS: string[] = [">=", ">", "<=", "<", "=="];
 const RECIPE_CHANNELS = ["telegram", "email", "push", "webhook"] as const;
@@ -2097,14 +2108,14 @@ async function resolveWatchlist(watchlistId: unknown): Promise<{ ok: true; list:
 
 server.registerTool("get_series", {
   title: "Recorded series: bars or points of one metric for one perpetual (price, OI, funding, CVD, liquidations, long/short, RSI and more)",
-  description: `Call this when the user wants the history of one recorded metric for one perpetual as a time series: price candles, volume, perp or spot CVD, open interest, funding (one venue, or OI-weighted across every venue as funding_agg), liquidations, long/short ratios, RSI, the Coinbase premium, US spot ETF flows, borrow rates or Hyperliquid whale net flow, for charting, backtesting or "what did X do over the last N days". Returns the /api/series answer (points as [t, v], or [t, o, h, l, c, v] for price, with unit, kind, source and source_kind, the bars served and whether member depth applied) plus provenance. metric is one of: ${SERIES_METRIC_KEYS.join(", ")} (unit, finest period and venue support of each: https://bykaranteli.com/api/series/metrics). The Free plan gets public depth: fewer bars and no bars under 15 minutes (1m, 3m, 5m, 10m); Builder and higher plans get member depth; the bar limits are in the same list. The answer names the venue it was read from (venue) and every venue a market-wide series sums (venues). Without from or limit, the newest 300 bars; pass from and to (ISO) for a window, or limit for more of the newest bars.`,
+  description: `Call this when the user wants the history of one recorded metric for one perpetual as a time series: price candles, volume, perp or spot CVD, open interest, funding (one venue, or OI-weighted across every venue as funding_agg), liquidations, long/short ratios, RSI, the Coinbase premium, US spot ETF flows, borrow rates or Hyperliquid whale net flow, for charting, backtesting or "what did X do over the last N days". Returns the /api/series answer (points as [t, v], or [t, o, h, l, c, v] for price, with unit, kind, source and source_kind, the bars served and whether member depth applied) plus provenance. metric is one of: ${SERIES_METRIC_KEYS.join(", ")} (unit, finest period and venue support of each: https://bykaranteli.com/api/series/metrics). The Free plan gets public depth: fewer bars and no bars under 15 minutes (1m, 3m, 5m, 10m); Builder and higher plans get member depth; the bar limits are in the same list. The answer names the venue it was read from (venue) and every venue a market-wide series sums (venues). Without from or limit, the newest 300 bars; pass limit for more of the newest bars, or from and to (ISO) for a window. The public window is the newest ${SERIES_ANON_BAR_LIMIT} bars of the period: a to before it needs member depth (Builder and higher plans) and answers 403 history_member_only otherwise, except daily and coarser price bars, which stay open to every plan.`,
   inputSchema: {
     metric: z.string().describe("string, metric key, e.g. price, oi, funding, liquidations (list: /api/series/metrics)"),
     symbol: z.string().optional().describe("string, optional Binance USDT-M perp or coin, e.g. BTCUSDT or BTC (default BTCUSDT)"),
     period: z.enum(SERIES_PERIODS).optional().describe(`string, optional bar period: ${SERIES_PERIODS.join(" | ")} (default 1h; each metric has a finest period)`),
     venue: z.string().optional().describe("string, optional venue id for price, oi, funding or borrow, e.g. okx (default binance)"),
     from: z.string().optional().describe("string, optional ISO start, e.g. 2026-09-01T00:00:00Z"),
-    to: z.string().optional().describe("string, optional ISO end (default now)"),
+    to: z.string().optional().describe(`string, optional ISO end (default now); a to before the newest ${SERIES_ANON_BAR_LIMIT} bars of the period needs member depth, except daily and coarser price bars`),
     limit: z.number().optional().describe(`number, optional newest bars, 10..${SERIES_MEMBER_BAR_LIMIT}; the plan's depth caps it (default 300 without from)`),
   },
   annotations: READ_ONLY,

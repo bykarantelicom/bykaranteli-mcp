@@ -2,6 +2,17 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.36.1] - 2026-10-21
+
+68 tools.
+
+### Changed
+
+- `get_series`: the description and the `to` parameter state the public window rule the route enforces since 2026-10-20: a `to` before the newest 300 bars of the period needs member depth (Builder and higher plans) and answers 403 `history_member_only` otherwise, except daily and coarser price bars, which stay open to every plan. The handler is unchanged: the route's own sentence reaches the model as the tool error.
+- `list_alert_recipes`: the description names `reachable` (whether a delivery channel is set up for the recipe) and `channels_available` (the delivery channels the account has connected), both in the answer since the web release of 2026-10-18.
+- README: the 401 causes paragraph (`x-byk-mcp-auth`: `key_required`, `key_unusable`, `key_wrong_type`, `key_unrecognised`; the `WWW-Authenticate` challenge starts the OAuth sign-in).
+- Short default answers, two more (the 0.35.0 rule; the package smoke test caught both at 46,000 and 47,000 characters): `get_factor_board` returns the first 40 rows without `limit` (`rows_total`, `rows_returned` and `trimmed` as on the other boards; `limit` up to 400 for the whole board), and `get_desk_notes` returns the newest 25 notes of the last 24 hours without arguments (`count` says how many came back; `limit` up to 100; `day` or `since` keep the route's 50).
+
 ## [0.36.0] - 2026-10-15
 
 68 tools.
