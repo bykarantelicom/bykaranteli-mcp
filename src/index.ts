@@ -50,7 +50,9 @@ function main(): void {
   // stdout is the JSON-RPC channel; log to stderr only. Out-of-band protocol errors (a frame the server could not
   // use) are reported there too, cut short: the SDK builds some messages from the client's own frame.
   serveStdio(buildServer, {
-    onerror: (err) => console.error(`bykaranteli-mcp: ${String(err.message ?? err).slice(0, 300)}`),
+    // The SDK's default, named so a later default change cannot silently drop the 2025-era clients.
+    legacy: "serve",
+    onerror: (err) => console.error(`bykaranteli-mcp: ${String(err.message ?? err).replace(/\s+/g, " ").slice(0, 300)}`),
   });
   console.error(`bykaranteli-mcp ready (base: ${BASE_URL})`);
 }

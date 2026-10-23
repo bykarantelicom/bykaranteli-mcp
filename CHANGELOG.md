@@ -2,6 +2,15 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.0.1] - 2026-10-23
+
+68 tools.
+
+### Changed
+
+- The stderr line for a frame the server could not use collapses whitespace before it is cut to 300 characters (a validation issue list spanned nineteen short lines; security review of the 1.0.0 release).
+- `serveStdio` is called with `legacy: "serve"` spelled out (the SDK's default), so a later change of that default cannot drop the 2025-era clients unnoticed (independent review of the 1.0.0 release).
+
 ## [1.0.0] - 2026-10-23
 
 68 tools.
