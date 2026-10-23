@@ -5,7 +5,7 @@
  * instance, so every tool has exactly one definition.
  */
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
 import { buildProvenance, pageForApiPath } from "./provenance.js";

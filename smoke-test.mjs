@@ -180,5 +180,65 @@ const movers = await call("get_top_movers");
 check("get_top_movers", !movers.isError && movers.text.includes("biggestOi24h"), "");
 
 child.kill();
+
+/* 1.0.0 (SDK 2.x): the same server answers the 2026-07-28 revision. A second process, because the opening exchange
+ * pins a stdio connection to one era: this one opens with `server/discover` carrying the per-request envelope and
+ * stays modern (an `initialize` on it is refused with the supported versions), the first one opened with `initialize`
+ * and stayed on the 2025-era revision it asked for. Modern results carry resultType, the cache fields on the cacheable
+ * ones (tools/list, server/discover) and the server identity in _meta. */
+const ENVELOPE = {
+  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+  "io.modelcontextprotocol/clientInfo": { name: "smoke-test", version: "0.0.0" },
+  "io.modelcontextprotocol/clientCapabilities": {},
+};
+const modern = spawn("node", ["dist/index.js"], { stdio: ["pipe", "pipe", "pipe"] });
+modern.stderr.on("data", (d) => process.stderr.write(`[server 2026] ${d}`));
+let mbuf = "";
+const mpending = new Map();
+modern.stdout.on("data", (d) => {
+  mbuf += d.toString();
+  let idx;
+  while ((idx = mbuf.indexOf("\n")) >= 0) {
+    const line = mbuf.slice(0, idx);
+    mbuf = mbuf.slice(idx + 1);
+    if (!line.trim()) continue;
+    const msg = JSON.parse(line);
+    if (msg.id !== undefined && mpending.has(msg.id)) {
+      mpending.get(msg.id)(msg);
+      mpending.delete(msg.id);
+    }
+  }
+});
+async function mrpc(method, params) {
+  if (PACE_MS > 0 && method === "tools/call") await new Promise((r) => setTimeout(r, PACE_MS));
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    mpending.set(id, resolve);
+    modern.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params: { ...(params ?? {}), _meta: ENVELOPE } }) + "\n");
+    setTimeout(() => reject(new Error(`timeout on ${method} (2026-07-28)`)), 25_000);
+  });
+}
+const discover = await mrpc("server/discover", {});
+check("2026-07-28 server/discover", Array.isArray(discover.result?.supportedVersions) && discover.result.supportedVersions.includes("2026-07-28") && discover.result.resultType === "complete" && discover.result._meta?.["io.modelcontextprotocol/serverInfo"]?.name === "bykaranteli", JSON.stringify(discover.result ?? discover.error).slice(0, 160));
+check("2026-07-28 server/discover carries the cache fields", typeof discover.result?.ttlMs === "number" && typeof discover.result?.cacheScope === "string", "");
+const mlist = await mrpc("tools/list", {});
+const mnames = (mlist.result?.tools ?? []).map((t) => t.name).sort();
+check("2026-07-28 tools/list is the same catalogue", mnames.length === names.length && mnames.every((n, i) => n === names[i]) && mlist.result.resultType === "complete" && typeof mlist.result.ttlMs === "number", `${mnames.length} tools`);
+check("2026-07-28 tools/list documents equal the 2025-era ones", JSON.stringify(mlist.result?.tools) === JSON.stringify(tools), "");
+const mcall = await mrpc("tools/call", { name: "get_market_indices", arguments: {} });
+check("2026-07-28 tools/call get_market_indices", mcall.result?.resultType === "complete" && !mcall.result?.isError && (mcall.result?.content?.[0]?.text ?? "").includes("fearGreed"), (mcall.result?.content?.[0]?.text ?? JSON.stringify(mcall.error ?? "")).slice(0, 100).replace(/\n/g, " "));
+const mbad = await mrpc("tools/call", { name: "get_liquidations", arguments: { symbol: "not a symbol!!" } });
+check("2026-07-28 invalid symbol rejected as a tool error", mbad.result?.isError === true && mbad.result?.resultType === "complete", (mbad.result?.content?.[0]?.text ?? "").slice(0, 70));
+const minit = await modernInit();
+check("2026-07-28 connection refuses the 2025 handshake with the supported list", minit.error?.code === -32022 && Array.isArray(minit.error?.data?.supported), JSON.stringify(minit.error ?? minit.result).slice(0, 120));
+async function modernInit() {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    mpending.set(id, resolve);
+    modern.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "smoke-test", version: "0.0.0" } } }) + "\n");
+    setTimeout(() => reject(new Error("timeout on initialize (2026-07-28 connection)")), 25_000);
+  });
+}
+modern.kill();
 console.log(failures.length === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures.length} FAILURES: ${failures.join(", ")}`);
 process.exit(failures.length === 0 ? 0 : 1);

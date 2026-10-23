@@ -2,6 +2,19 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.0.0] - 2026-10-23
+
+68 tools.
+
+### Changed
+
+- The server moved from the maintenance line of the MCP TypeScript SDK (`@modelcontextprotocol/sdk` 1.32) to its stable line, `@modelcontextprotocol/server` 2.3, which implements the 2026-07-28 revision of the protocol. The tools, their names, descriptions, inputs and answers are unchanged.
+- Both protocol eras are served: a client that opens with the 2025-era `initialize` handshake (every client released before the 2026-07-28 revision) is served exactly as 0.36 served it, on the revision it negotiates; a client that opens with a 2026-07-28 per-request envelope (`server/discover` first) is served on that revision, with `resultType`, the cache fields on the cacheable results and the server identity in `_meta`. The era is decided by the opening exchange and pinned for the connection.
+- Node.js 20 or newer is required (the SDK's floor; the 0.x releases ran on 18).
+- Tool input errors no longer carry the `MCP error -32602:` prefix the 1.x SDK added to the text: a tool error now starts with `Input validation error: Invalid arguments for tool <name>: ...`, and the 2,000-element ceiling reads `Invalid arguments for tool <name>: arguments contain more than the maximum of 2000 elements`. A call to a tool name the server does not have is a JSON-RPC error (`-32602`, `Tool <name> not found`) instead of a tool error result.
+- Advertised input schemas carry `$schema` (JSON Schema 2020-12) and no longer carry `additionalProperties: false` (the SDK's conversion); the properties, types, enums and descriptions are unchanged.
+- The README's OAuth paragraph names client metadata documents, which the hosted endpoint's authorization server accepts from this release's web deployment on.
+
 ## [0.36.2] - 2026-10-23
 
 68 tools.

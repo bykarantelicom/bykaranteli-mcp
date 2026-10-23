@@ -20,9 +20,11 @@ listing the tools work without one. The key travels one of three ways:
 
 Or sign in with OAuth 2.1 where the client offers it (claude.ai custom
 connectors: Authentication, Sign in; ChatGPT connectors: OAuth): the client
-registers itself (RFC 7591, PKCE S256), you approve it once on bykaranteli.com
-and it runs on a key of your own account, which the Data and API page lists
-under connected apps. Discovery:
+identifies itself with its client metadata document (an https client id the
+authorization server reads, the way the 2026-07-28 MCP revision prefers) or
+registers itself (RFC 7591), always with PKCE S256; you approve it once on
+bykaranteli.com and it runs on a key of your own account, which the Data and
+API page lists under connected apps. Discovery:
 <https://mcp.bykaranteli.com/.well-known/oauth-protected-resource>.
 
 A free account covers the API and the hosted MCP on one monthly counter;
@@ -58,7 +60,7 @@ Add to `claude_desktop_config.json`:
 
 Any stdio MCP client works: command `npx`, args `["-y", "bykaranteli-mcp"]`, env `BYKARANTELI_API_KEY`.
 
-Requires Node.js 18 or newer.
+Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). The server speaks both the 2026-07-28 revision of the protocol and the 2025-era `initialize` handshake, so every MCP client released so far connects unchanged.
 
 ## Tools
 
