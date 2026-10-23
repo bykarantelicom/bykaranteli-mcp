@@ -1,6 +1,6 @@
 {
   "name": "bykaranteli-mcp",
-  "version": "0.36.1",
+  "version": "0.36.2",
   "description": "MCP server for live crypto derivatives data from bykaranteli.com: funding rates, funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance. 68 read-only and account tools (the alert and watchlist tools act on your own account), free account key, paid depth via plans or x402.",
   "type": "module",
   "bin": {
@@ -47,7 +47,7 @@
     "url": "https://github.com/bykarantelicom/bykaranteli-mcp/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

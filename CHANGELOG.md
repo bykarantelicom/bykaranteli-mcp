@@ -2,6 +2,16 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [0.36.2] - 2026-10-23
+
+68 tools.
+
+### Changed
+
+- `@modelcontextprotocol/sdk` floor raised from `^1.12.0` to `^1.32.1`: the SDK's October 2026 advisories (OAuth client redirect handling, experimental task sessions, the DoS through deeply nested tool arguments, GHSA-46jr) are fixed from 1.32.0, and an install of this package now resolves at least that version.
+- The stdio server sets `maxToolInputElements` to 2,000 (an SDK 1.32 option): a `tools/call` whose arguments carry more than two thousand array elements and object members combined is answered `-32602` before validation. The largest real input, an alert recipe, is a few dozen members. The hosted endpoint on bykaranteli.com applies the same ceiling.
+- Tool input errors read as `<message> at <path>` lines (SDK 1.32 formats Zod issues this way, one per line) instead of the earlier raw issue dump; a `tools/call` without an `arguments` member is validated as `{}` (so a tool whose inputs are all optional answers instead of refusing).
+
 ## [0.36.1] - 2026-10-21
 
 68 tools.

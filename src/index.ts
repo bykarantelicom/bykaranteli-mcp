@@ -21,10 +21,18 @@ const { version: VERSION } = createRequire(import.meta.url)("../package.json") a
 
 const BASE_URL = (process.env.BYKARANTELI_BASE_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
 
-const server = new McpServer({
-  name: "bykaranteli",
-  version: VERSION,
-});
+/* GHSA-46jr (SDK 1.32.0): the combined number of array elements and object members one tools/call `arguments`
+ * payload may carry; above it the SDK answers -32602 before validation. The largest real input is an alert recipe
+ * (a few dozen members); the hosted endpoint sets the same ceiling. */
+const MAX_TOOL_INPUT_ELEMENTS = 2_000;
+
+const server = new McpServer(
+  {
+    name: "bykaranteli",
+    version: VERSION,
+  },
+  { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS },
+);
 registerByKaranteliTools(server, { version: VERSION });
 
 async function main() {
