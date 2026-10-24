@@ -1,6 +1,6 @@
 {
   "name": "bykaranteli-mcp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "MCP server for live crypto derivatives data from bykaranteli.com: funding rates, funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance. 68 read-only and account tools (the alert and watchlist tools act on your own account), free account key, paid depth via plans or x402.",
   "type": "module",
   "bin": {
@@ -17,7 +17,9 @@
     "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', 0o755)\"",
     "prepublishOnly": "npm run build",
     "start": "node dist/index.js",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "node --test test/*.test.mjs",
+    "pretest": "npm run -s build"
   },
   "engines": {
     "node": ">=20"
@@ -63,6 +65,10 @@
     "./tools": {
       "types": "./dist/tools.d.ts",
       "default": "./dist/tools.js"
+    },
+    "./compact": {
+      "types": "./dist/compact.d.ts",
+      "default": "./dist/compact.js"
     }
   }
 }

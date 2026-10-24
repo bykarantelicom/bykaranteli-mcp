@@ -2,6 +2,16 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.0] - 2026-10-24
+
+68 tools.
+
+### Added
+
+- `detail` on thirteen large tools (get_liqmap, get_turkey_premium, get_correlations, get_hl_whales, get_options_flow, get_funding_arbitrage, get_desk_notes, get_positioning, get_coverage, get_new_listings, get_venue_markets, get_tokenized_stocks, get_factor_board): `"compact"` answers a shorter page than the default one (fewer rows, numbers rounded to six significant digits, long free text cut, the LiqMap heatmap grid and axes left out, each pair of the correlation matrix once for BTC and ETH), `"full"` the whole route answer (still under the 100,000 character ceiling of every answer), omitted the default first page. Every cut is named in `trimmed` as before. get_liqmap and get_coverage keep their boolean form, where `true` means full. Measured against the live routes on 24 Oct 2026: every compact answer under 25,000 characters.
+- `compact` entry (`bykaranteli-mcp/compact`): `compactValue`, `compactToolText` and the per-tool `COMPACT_RULES`, the code the compact pages use, exported for hosts that run the tools in process and cap an answer's size themselves (the AI desk on bykaranteli.com).
+- `headersProvider` in the register options: extra request headers read per outbound fetch, for a host that marks member depth for the caller it answers for. Never a credential.
+
 ## [1.0.1] - 2026-10-23
 
 68 tools.

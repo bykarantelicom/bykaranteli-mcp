@@ -129,6 +129,8 @@ All market answers are JSON and carry a `generatedAt` timestamp, a `source` URL 
 
 Answers are sized for a model's context: a call without arguments returns a short first page (for example 30 rows, or the newest points of a series), never a whole board. Every shortened list is named in `trimmed` with `field`, `returned`, `total` and `more`, the parameter that returns the rest (`symbol`, `coin`, `asset`, `limit`, `days`, `detail` and the like); a filtered call keeps its full detail. One answer is capped at 100,000 characters; above that the tool says how to narrow the call.
 
+Thirteen large tools (get_liqmap, get_turkey_premium, get_correlations, get_hl_whales, get_options_flow, get_funding_arbitrage, get_desk_notes, get_positioning, get_coverage, get_new_listings, get_venue_markets, get_tokenized_stocks, get_factor_board) also take `detail`: `"compact"` answers a shorter page than the default one (fewer rows, numbers rounded to six significant digits, long free text cut, grids left out; every cut named in `trimmed`), `"full"` the whole route answer. get_liqmap and get_coverage keep their boolean form, where `true` means full. Since 1.1.0.
+
 ## Account tools (alerts and watchlist)
 
 These tools read and change your own ByKaranteli account with the same key: the alert recipes that notify you on Telegram, email, push or webhook, and your watchlists. They never trade, move funds or touch another account.

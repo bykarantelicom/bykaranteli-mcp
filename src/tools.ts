@@ -8,6 +8,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
+import { COMPACT_RULES, type CompactToolName, compactValue } from "./compact.js";
 import { buildProvenance, pageForApiPath } from "./provenance.js";
 
 export type RegisterOptions = {
@@ -29,6 +30,9 @@ export type RegisterOptions = {
   /** Per-call Authorization value, for hosts that forward their caller's key
    * (the hosted endpoint). Takes precedence over apiKey when it returns one. */
   authorizationProvider?: () => string | undefined;
+  /** Extra request headers for every outbound fetch, read per call (1.1.0): the hosted AI desk marks the member depth
+   * of the signed-in member it answers for. Never a credential; those go through apiKey or authorizationProvider. */
+  headersProvider?: () => Record<string, string> | undefined;
 };
 
 export function registerByKaranteliTools(target: McpServer, options?: RegisterOptions): void {
@@ -47,6 +51,17 @@ export function registerByKaranteliTools(target: McpServer, options?: RegisterOp
   const USER_AGENT = `bykaranteli-mcp/${options?.version ?? "dev"} (+https://github.com/bykarantelicom/bykaranteli-mcp)`;
   const TIMEOUT_MS = 15_000;
   const STATIC_KEY = (options?.apiKey ?? process.env.BYKARANTELI_API_KEY ?? "").trim();
+  /* headersProvider output, lower-cased, without anything that could carry a credential or change the exchange:
+   * the fixed headers and the forwarded authorization always win (package review 24 Oct 2026). */
+  const BLOCKED_EXTRA = new Set(["authorization", "proxy-authorization", "cookie", "x-api-key", "accept", "user-agent", "host", "content-type", "content-length"]);
+  const extraHeaders = (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(options?.headersProvider?.() ?? {})) {
+      const key = k.toLowerCase();
+      if (!BLOCKED_EXTRA.has(key) && typeof v === "string") out[key] = v;
+    }
+    return out;
+  };
   const authorizationFor = (): string | undefined => {
     /* A host that forwards its callers' keys (authorizationProvider) never falls back to a static key: on the
      * hosted endpoint that fallback would have let every keyless caller act as whatever key the process held
@@ -74,6 +89,7 @@ async function fetchJson(path: string): Promise<unknown> {
       headers: {
         accept: "application/json",
         "user-agent": USER_AGENT,
+        ...extraHeaders(),
         ...(authorization ? { authorization } : {}),
       },
     });
@@ -133,7 +149,7 @@ function ok(data: unknown): ToolResult {
         truncated: true,
         chars: text.length,
         limit: MAX_RESULT_CHARS,
-        note: "Result too large for one context window. Narrow the call: fewer hours or days, a single symbol, or include_points=false, then call again.",
+        note: "Result too large for one context window. Narrow the call: a single symbol, fewer hours or days, a smaller limit, or detail \"compact\" where the tool offers it, then call again.",
       }),
     }],
   };
@@ -183,6 +199,23 @@ function trimmedAnswer(full: unknown, cut: (rec: Rec, t: Trim) => void, rowsFiel
 
 function compact(data: unknown, path: string, cut: (rec: Rec, t: Trim) => void, rowsField?: string): unknown {
   return trimmedAnswer(withProvenance(data, path), cut, rowsField);
+}
+
+/* detail (1.1.0, the AI desk on bykaranteli.com and any client that wants a smaller answer): "full" is the whole route
+ * answer, "compact" a shorter page than the default one (src/compact.ts: fewer rows, rounded figures, long text cut,
+ * grids left out, every cut named in `trimmed`), omitted the default first page. get_liqmap and get_coverage keep
+ * their older boolean, where true means full. */
+type Detail = "compact" | "full" | boolean | undefined;
+const DETAIL = z
+  .union([z.boolean(), z.enum(["compact", "full"])])
+  .optional()
+  .describe('Optional. "compact": a shorter page than the default (fewer rows, newest points kept, rounded figures, long text cut, grids left out; every cut named in trimmed). "full" or true: the whole route answer, still under the 100,000 character ceiling (the largest boards answer the ceiling note then: narrow them with symbol, limit or days instead). Omitted or false: the default first page.');
+const wantsFull = (d: Detail): boolean => d === true || d === "full";
+const wantsCompact = (d: Detail): boolean => d === "compact";
+/** ok(page), or ok(the compact page) when the caller asked for detail \"compact\": rounding, text and grid rules of
+ * src/compact.ts; the lists were cut by the handler. */
+function okDetail(name: CompactToolName, detail: Detail, page: unknown): ToolResult {
+  return ok(wantsCompact(detail) ? compactValue(page, COMPACT_RULES[name]).value : page);
 }
 
 /** The newest `days` distinct dates of rows carrying a `date` field, in the route's order. */
@@ -449,25 +482,28 @@ server.registerTool(
   {
     title: "Cross-exchange funding arbitrage opportunities",
     description:
-      "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across every venue on the board, from Binance, OKX and Bybit to Hyperliquid, dYdX and the smaller perp venues fed by the venue snapshot, for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost). Each row lists its first 5 venue legs; pass symbol for every leg of one perp.",
+      "Call this when the user asks about funding arbitrage, funding rate differences between exchanges, or delta-neutral carry trades. Compares funding across every venue on the board, from Binance, OKX and Bybit to Hyperliquid, dYdX and the smaller perp venues fed by the venue snapshot, for 12 major perps and returns the best long/short venue per symbol with gross and net annualized APR (net of taker fees and weekly rebalance cost). Each row lists its first 5 venue legs; pass symbol for every leg of one perp. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       symbol: z.string().optional().describe("Optional. One perp, e.g. BTCUSDT or BTC: its row with every venue leg."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol }: { symbol?: string }) => {
+  async ({ symbol, detail }: { symbol?: string; detail?: Detail }) => {
     try {
       const d = (await fetchJson("/api/public/funding-arb")) as Record<string, unknown>;
       const full = { ...d, source: `${PUBLIC_URL}/funding-arb`, provenance: provenanceFor(d, "/api/public/funding-arb") };
       const rows = list(d.rows).filter(isRec);
       if (symbol) {
+        /* A filtered call keeps every leg of that perp at every detail level. */
         const want = normalizeSymbol(symbol);
         const row = rows.find((r) => r.symbol === want);
         if (!row) return ok({ generatedAt: d.generatedAt, note: `${want} is not on the funding arbitrage board. Symbols: ${rows.map((r) => String(r.symbol)).join(", ")}` });
-        return ok({ ...full, rows: [row] });
+        return okDetail("get_funding_arbitrage", detail, { ...full, rows: [row] });
       }
-      const LEGS = 5;
-      return ok(trimmedAnswer(full, (rec, t) => {
+      if (wantsFull(detail)) return ok(full);
+      const LEGS = wantsCompact(detail) ? 3 : 5;
+      return okDetail("get_funding_arbitrage", detail, trimmedAnswer(full, (rec, t) => {
         let kept = 0;
         let total = 0;
         rec.rows = rows.map((r) => {
@@ -654,13 +690,30 @@ server.registerTool(
   {
     title: "Options tape: biggest prints and premium flow (BTC + ETH)",
     description:
-      "Call this when the user asks what big options players are buying, about block trades, or whether call or put premium dominates today. Returns 24h call vs put premium bought (net of the sold legs of the same multi-leg block or combo, so a spread counts its net premium), the block-trade share, the multi-leg structure count, and the largest prints of the last 48 hours with strikes, premium, IV, structure id and venue (Deribit or OKX). Updated every 15 minutes.",
-    inputSchema: {},
+      "Call this when the user asks what big options players are buying, about block trades, or whether call or put premium dominates today. Returns 24h call vs put premium bought (net of the sold legs of the same multi-leg block or combo, so a spread counts its net premium), the block-trade share, the multi-leg structure count, and the largest prints of the last 48 hours with strikes, premium, IV, structure id and venue (Deribit or OKX). Updated every 15 minutes. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+    inputSchema: { detail: DETAIL },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ detail }: { detail?: Detail }) => {
     try {
-      return ok(withProvenance(await fetchJson("/api/public/options-flow"), "/api/public/options-flow"));
+      const path = "/api/public/options-flow";
+      const data = await fetchJson(path);
+      if (!wantsCompact(detail)) return ok(withProvenance(data, path));
+      /* compact: the first 8 of each per-asset list (the route orders them largest first), the 48h top prints whole. */
+      return okDetail("get_options_flow", detail, compact(data, path, (rec, t) => {
+        if (!isRec(rec.assets)) return;
+        const assets: Rec = {};
+        for (const [asset, value] of Object.entries(rec.assets)) {
+          if (!isRec(value)) {
+            assets[asset] = value;
+            continue;
+          }
+          const out: Rec = { ...value };
+          for (const key of ["by_expiry", "by_strike", "by_venue", "structures"]) out[key] = t.head(value[key], 8, `assets.${asset}.${key}`, "omit detail for the default page");
+          assets[asset] = out;
+        }
+        rec.assets = assets;
+      }));
     } catch (err) {
       return fail(err);
     }
@@ -781,7 +834,7 @@ server.registerTool(
   {
     title: "Tokenized stocks onchain: supply, premium to the real share, DEX pools and exchange pairs",
     description:
-      "Call this when the user asks about tokenized stocks or stock tokens (xStocks, Ondo, Robinhood stock tokens, Coinbase tokenized stocks on Base, Binance bStocks, Backpack, Gate gStocks, Reality, Superstate, Figure, Dinari dShares, Securitize): how much of a stock exists onchain, which issuer or chain holds the most, whether a wrapper trades above or below the real share, which DEX pools or exchanges trade it. Returns the board ByKaranteli refreshes every 10 minutes: per underlying the reference share price and its session, each wrapper (issuer, chain, price, premium_pct against a fresh reference, DEX liquidity and 24h volume from admitted pools, supply in shares and dollars, holders, status), tokenized spot pairs on the exchanges the board lists, the perpetual futures cross, and totals (supply by issuer and chain, DEX volume, median premium). Each wrapper's price_source names the price that valued its supply dollars (reference: the share's reference price; issuer_oracle: the issuer's own price for the token; wrapper: its own pool or exchange price; null: no dollars), and totals.priced_by counts the counted wrappers per level, unpriced included. Wrappers come from issuer sources only, never from a name search. Without underlying, each stock lists its first 3 wrappers and 3 exchange pairs; pass underlying for all of them.",
+      "Call this when the user asks about tokenized stocks or stock tokens (xStocks, Ondo, Robinhood stock tokens, Coinbase tokenized stocks on Base, Binance bStocks, Backpack, Gate gStocks, Reality, Superstate, Figure, Dinari dShares, Securitize): how much of a stock exists onchain, which issuer or chain holds the most, whether a wrapper trades above or below the real share, which DEX pools or exchanges trade it. Returns the board ByKaranteli refreshes every 10 minutes: per underlying the reference share price and its session, each wrapper (issuer, chain, price, premium_pct against a fresh reference, DEX liquidity and 24h volume from admitted pools, supply in shares and dollars, holders, status), tokenized spot pairs on the exchanges the board lists, the perpetual futures cross, and totals (supply by issuer and chain, DEX volume, median premium). Each wrapper's price_source names the price that valued its supply dollars (reference: the share's reference price; issuer_oracle: the issuer's own price for the token; wrapper: its own pool or exchange price; null: no dollars), and totals.priced_by counts the counted wrappers per level, unpriced included. Wrappers come from issuer sources only, never from a name search. Without underlying, each stock lists its first 3 wrappers and 3 exchange pairs; pass underlying for all of them. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       underlying: z.string().regex(/^[A-Za-z0-9.]{1,16}$/).optional().describe("Stock ticker, e.g. TSLA; omit for the whole board."),
       /* Issuer ids mirror TOKENIZED_ISSUER_IDS in web/src/lib/tokenized-equities/meta.ts (the hosted tool reads that list
@@ -792,22 +845,23 @@ server.registerTool(
         .describe("One issuer: xstocks, robinhood, coinbase, bstocks, ondo, backpack, gstocks, reality, superstate, figure, dinari or securitize; omit for every issuer."),
       chain: z.string().regex(/^[a-z]{2,12}$/).optional().describe("One chain, e.g. solana, base, bnb, robinhood, ethereum, ton, all (xStocks circulating) or cex (exchange pairs)."),
       top: z.number().int().min(1).max(200).optional().describe("Rows by supply (default 10, max 200)."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ underlying, issuer, chain, top }: { underlying?: string; issuer?: string; chain?: string; top?: number }) => {
+  async ({ underlying, issuer, chain, top, detail }: { underlying?: string; issuer?: string; chain?: string; top?: number; detail?: Detail }) => {
     try {
       const params = new URLSearchParams();
       if (underlying) params.set("underlying", underlying.toUpperCase());
       if (issuer) params.set("issuer", issuer);
       if (chain) params.set("chain", chain);
       /* 0.35.0: 10 rows by default (20 full rows were 113k characters). */
-      params.set("top", String(top ?? 10));
+      params.set("top", String(top ?? (wantsFull(detail) ? 200 : wantsCompact(detail) ? 6 : 10)));
       const path = `/api/public/tokenized-stocks?${params.toString()}`;
       const data = await fetchJson(path);
-      if (underlying) return ok(withProvenance(data, path));
-      const N = 3;
-      return ok(compact(data, path, (rec, t) => {
+      if (underlying || wantsFull(detail)) return okDetail("get_tokenized_stocks", detail, withProvenance(data, path));
+      const N = wantsCompact(detail) ? 2 : 3;
+      return okDetail("get_tokenized_stocks", detail, compact(data, path, (rec, t) => {
         const kept = { wrappers: 0, cex: 0 };
         const total = { wrappers: 0, cex: 0 };
         rec.rows = list(rec.rows).map((r) => {
@@ -948,17 +1002,18 @@ server.registerTool(
   {
     title: "Factor board: what followed days like today across recorded metrics",
     description:
-      "Call this when the user asks which indicators currently sit in an unusual band, whether a metric's current level historically preceded BTC moves, or for a cross-metric conditional overview. Returns every recorded metric in its historical band with the median 7-day BTC move that followed versus the base rate, with an n >= 30 gate; distributions, not forecasts. Without limit the first 40 rows in the board's own order (rows_total counts every row, trimmed names the cut); pass limit up to 400 for the whole board.",
+      "Call this when the user asks which indicators currently sit in an unusual band, whether a metric's current level historically preceded BTC moves, or for a cross-metric conditional overview. Returns every recorded metric in its historical band with the median 7-day BTC move that followed versus the base rate, with an n >= 30 gate; distributions, not forecasts. Without limit the first 40 rows in the board's own order (rows_total counts every row, trimmed names the cut); pass limit up to 400 for the whole board. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       limit: z.coerce.number().int().min(1).max(400).optional().describe("Optional. Rows to return, 1..400 (default 40)"),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ limit }: { limit?: number }) => {
+  async ({ limit, detail }: { limit?: number; detail?: Detail }) => {
     try {
       /* 0.36.1: 79 rows of about 600 characters answered 46,000 characters without arguments; a first page of 40. */
-      const n = limit ?? 40;
-      return ok(compact(await fetchJson("/api/public/factors"), "/api/public/factors", (rec, t) => {
+      const n = wantsFull(detail) ? 400 : limit ?? (wantsCompact(detail) ? 15 : 40);
+      return okDetail("get_factor_board", detail, compact(await fetchJson("/api/public/factors"), "/api/public/factors", (rec, t) => {
         rec.rows = t.head(rec.rows, n, "rows", "pass limit up to 400");
       }, "rows"));
     } catch (err) {
@@ -1166,11 +1221,12 @@ server.registerTool(
   {
     title: "Exchange coverage: OI, volume, funding and pegs across every exchange we snapshot",
     description:
-      "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across every perpetual and spot feed we poll (the coverage field lists them); pass symbol for one coin's per-venue rows. Without symbol, rows holds the 30 venue markets with the largest open interest; pass symbol, or limit (up to 250) for more.",
+      "Call this when the user asks about total open interest across exchanges, which venues hold the most OI, DEX versus CEX share, funding dispersion between venues, or stablecoin pegs. Returns the latest 10-minute snapshot aggregates across every perpetual and spot feed we poll (the coverage field lists them); pass symbol for one coin's per-venue rows. Without symbol, rows holds the 30 venue markets with the largest open interest; pass symbol, or limit (up to 250) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       symbol: z.string().optional().describe("string, optional base asset, e.g. BTC"),
       history_days: z.number().int().min(1).max(90).optional().describe("Return the hourly multi-venue open interest history (total, DEX share, OI-weighted funding) for this many days instead of the snapshot"),
       limit: z.coerce.number().int().min(1).max(250).optional().describe("Optional. Venue market rows without symbol, largest open interest first (default 30)."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
@@ -1180,14 +1236,31 @@ server.registerTool(
         ? `/api/public/venues/oi-history?days=${Math.min(90, Math.floor(args.history_days))}`
         : args.symbol ? `/api/public/venues/markets?symbol=${encodeURIComponent(args.symbol.toUpperCase())}` : "/api/public/venues/markets";
       const data = await fetchJson(path);
-      if (args.history_days || args.symbol) return ok(withProvenance(data, path));
+      const c = wantsCompact(args.detail);
+      if (wantsFull(args.detail)) return ok(withProvenance(data, path));
+      if (args.history_days) {
+        if (!c) return ok(withProvenance(data, path));
+        /* compact: the hourly history runs oldest first, so the newest 24 points are its tail. */
+        return okDetail("get_venue_markets", args.detail, compact(data, path, (rec, t) => {
+          const points = list(rec.points);
+          if (points.length > 24) {
+            rec.points = points.slice(-24);
+            t.note("points", 24, points.length, "omit detail for every point of the window");
+          }
+        }));
+      }
+      if (args.symbol && !c) return ok(withProvenance(data, path));
       /* The route lists rows by venue; the board's own ranking is open interest, then 24h volume for the rows
        * without open interest (spot). */
-      const n = Number(args.limit ?? 30);
+      const n = Number(args.limit ?? (c ? 12 : 30));
       const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : -1);
-      return ok(compact(data, path, (rec, t) => {
+      return okDetail("get_venue_markets", args.detail, compact(data, path, (rec, t) => {
         const ranked = list(rec.rows).filter(isRec).sort((a, b) => num(b.open_interest_usd) - num(a.open_interest_usd) || num(b.volume_24h_usd) - num(a.volume_24h_usd));
-        rec.rows = t.head(ranked, n, "rows", "pass symbol for one coin's rows on every venue, or limit up to 250");
+        rec.rows = t.head(ranked, n, "rows", args.symbol ? "omit detail for every venue of this coin" : "pass symbol for one coin's rows on every venue, or limit up to 250");
+        if (c && !args.symbol) {
+          rec.symbols = t.head(rec.symbols, 12, "symbols", "omit detail for every symbol");
+          rec.coverage = t.head(rec.coverage, 15, "coverage", "omit detail for every feed");
+        }
       }, "rows"));
     } catch (err) {
       return fail(err);
@@ -1270,13 +1343,29 @@ server.registerTool(
   {
     title: "Crypto correlation matrix",
     description:
-      "Call this when the user asks how correlated two coins are, for decorrelated pairs, or how tightly alts track BTC. Returns the 30-day rolling Pearson correlation matrix of daily returns across the top perpetuals.",
-    inputSchema: {},
+      "Call this when the user asks how correlated two coins are, for decorrelated pairs, or how tightly alts track BTC. Returns the 30-day rolling Pearson correlation matrix of daily returns across the top perpetuals. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+    inputSchema: { detail: DETAIL },
     annotations: READ_ONLY,
   },
-  async () => {
+  async ({ detail }: { detail?: Detail }) => {
     try {
-      return ok(withProvenance(await fetchJson("/api/public/correlations"), "/api/public/correlations"));
+      const path = "/api/public/correlations";
+      const data = withProvenance(await fetchJson(path), path);
+      if (!wantsCompact(detail) || !isRec(data)) return ok(data);
+      /* compact: the pairs that involve BTC or ETH, each pair once (the whole matrix is 400 cells). */
+      const cells = list(data.cells).filter(isRec);
+      const majors = new Set(["BTCUSDT", "ETHUSDT"]);
+      const seen = new Set<string>();
+      const kept = cells.filter((c) => {
+        const a = String(c.symbolA);
+        const b = String(c.symbolB);
+        if (a === b || (!majors.has(a) && !majors.has(b))) return false;
+        const key = [a, b].sort().join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return okDetail("get_correlations", detail, { ...data, cells: kept, trimmed: [{ field: "cells", returned: kept.length, total: cells.length, more: "omit detail for the whole matrix" }] });
     } catch (err) {
       return fail(err);
     }
@@ -1288,14 +1377,23 @@ server.registerTool(
   {
     title: "New and delisted perpetual contracts",
     description:
-      "Call this when the user asks what new perpetuals were listed, which exchange listed a coin first, or about delistings. Returns listings and delistings across every exchange the hourly scan covers.",
-    inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Window in days, 1-30 (default 30). Longer listing history is the listings dataset at bykaranteli.com/data.") },
+      "Call this when the user asks what new perpetuals were listed, which exchange listed a coin first, or about delistings. Returns listings and delistings across every exchange the hourly scan covers. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+    inputSchema: {
+      days: z.number().int().min(1).max(30).optional().describe("Window in days, 1-30 (default 30). Longer listing history is the listings dataset at bykaranteli.com/data."),
+      detail: DETAIL,
+    },
     annotations: READ_ONLY,
   },
   async (args) => {
     try {
       const path = `/api/public/listings?days=${args.days && args.days > 0 ? Math.floor(args.days) : 30}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (!wantsCompact(args.detail)) return ok(withProvenance(data, path));
+      /* compact: the newest 15 listings and 10 delistings (the route lists newest first). */
+      return okDetail("get_new_listings", args.detail, compact(data, path, (rec, t) => {
+        rec.listed = t.head(rec.listed, 15, "listed", "omit detail for the whole window");
+        rec.delisted = t.head(rec.delisted, 10, "delisted", "omit detail for the whole window");
+      }));
     } catch (err) {
       return fail(err);
     }
@@ -1396,7 +1494,7 @@ server.registerTool(
   {
     title: "LiqMap: estimated liquidation clusters with real prints overlaid",
     description:
-      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). On the Free plan the 24h view; on Builder and higher plans every timeframe from 1h to 30d. By default the 30 real levels nearest the price and the 30 newest real prints; pass detail=true for all of them.",
+      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). On the Free plan the 24h view; on Builder and higher plans every timeframe from 1h to 30d. By default the 30 real levels nearest the price and the 30 largest real prints; pass detail \"full\" for all of them. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       symbol: z
         .string()
@@ -1409,11 +1507,11 @@ server.registerTool(
         .enum(["1h", "4h", "12h", "24h", "3d", "1w", "30d"])
         .optional()
         .describe("Model window. Default 24h, the only one on the Free plan; Builder and higher plans get every window."),
-      detail: z.boolean().optional().describe("Optional. true: every real level and every real print (default false: the 30 nearest levels, the 30 newest prints)."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol, timeframe, detail }: { symbol?: string; timeframe?: string; detail?: boolean }) => {
+  async ({ symbol, timeframe, detail }: { symbol?: string; timeframe?: string; detail?: Detail }) => {
     try {
       const raw = symbol ?? "BTCUSDT";
       const sym = raw.endsWith("USDT") ? raw : `${raw}USDT`;
@@ -1421,20 +1519,21 @@ server.registerTool(
       const data = await fetchJson(path);
       const page = `/liqmap/${sym.replace(/USDT$/, "").toLowerCase()}`;
       const full = { ...(data as Record<string, unknown>), source: `${PUBLIC_URL}${page}`, provenance: provenanceFor(data, path, page) };
-      if (detail) return ok(full);
-      const N = 30;
-      return ok(trimmedAnswer(full, (rec, t) => {
+      if (wantsFull(detail)) return ok(full);
+      const N = wantsCompact(detail) ? 12 : 30;
+      const P = wantsCompact(detail) ? 10 : 30;
+      return okDetail("get_liqmap", detail, trimmedAnswer(full, (rec, t) => {
         if (isRec(rec.real_levels) && Array.isArray(rec.real_levels.levels) && rec.real_levels.levels.length > N) {
           /* The levels nearest the price, kept in the route's price order. */
           const levels = rec.real_levels.levels as unknown[];
           const dist = (l: unknown) => (isRec(l) && typeof l.distance_pct === "number" ? Math.abs(l.distance_pct) : Infinity);
           const nearest = new Set([...levels].sort((a, b) => dist(a) - dist(b)).slice(0, N));
           rec.real_levels = { ...rec.real_levels, levels: levels.filter((l) => nearest.has(l)) };
-          t.note("real_levels.levels", N, levels.length, "pass detail=true for every level");
+          t.note("real_levels.levels", N, levels.length, 'pass detail \"full\" for every level');
         }
         if (isRec(rec.real_liquidations)) {
-          /* Newest print first. */
-          rec.real_liquidations = { ...rec.real_liquidations, points: t.head(rec.real_liquidations.points, N, "real_liquidations.points", "pass detail=true for every print") };
+          /* Largest print first (the route orders prints by size). */
+          rec.real_liquidations = { ...rec.real_liquidations, points: t.head(rec.real_liquidations.points, P, "real_liquidations.points", 'pass detail \"full\" for every print') };
         }
       }));
     } catch (err) {
@@ -1553,15 +1652,16 @@ server.registerTool(
   {
     title: "Hyperliquid whale tracker: top-300 accounts, long vs short, positions, changes",
     description:
-      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the 300 largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes. Without coin, the 30 largest coins and positions; pass coin, or limit (up to 200) for more.",
+      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the 300 largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes. Without coin, the 30 largest coins and positions; pass coin, or limit (up to 200) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       coin: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,24}$/).optional().describe("One coin, e.g. BTC"),
       events: z.boolean().optional().describe("Include the last 200 position change events"),
       limit: z.coerce.number().int().min(1).max(200).optional().describe("Optional. Coins and positions without coin, largest first (default 30)."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ coin, events, limit }: { coin?: string; events?: boolean; limit?: number }) => {
+  async ({ coin, events, limit, detail }: { coin?: string; events?: boolean; limit?: number; detail?: Detail }) => {
     try {
       const params = new URLSearchParams();
       if (coin) params.set("coin", coin);
@@ -1569,10 +1669,11 @@ server.registerTool(
       const qs = params.toString();
       const path = `/api/public/hyperliquid-whales${qs ? `?${qs}` : ""}`;
       const data = await fetchJson(path);
-      if (coin) return ok(withProvenance(data, path));
-      return ok(compact(data, path, (rec, t) => {
-        rec.by_coin = t.head(rec.by_coin, limit ?? 30, "by_coin", "pass coin, or limit up to 200");
-        rec.positions = t.head(rec.positions, limit ?? 30, "positions", "pass coin, or limit up to 200");
+      if (coin || wantsFull(detail)) return okDetail("get_hl_whales", detail, withProvenance(data, path));
+      return okDetail("get_hl_whales", detail, compact(data, path, (rec, t) => {
+        const n = limit ?? (wantsCompact(detail) ? 10 : 30);
+        rec.by_coin = t.head(rec.by_coin, n, "by_coin", "pass coin, or limit up to 200");
+        rec.positions = t.head(rec.positions, n, "positions", "pass coin, or limit up to 200");
       }, "positions"));
     } catch (err) {
       return fail(err);
@@ -1585,22 +1686,24 @@ server.registerTool(
   {
     title: "Positioning: long/short ratios, taker buy/sell and CVD across exchanges",
     description:
-      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps on every perpetual venue the positioning board records (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume, Gate account and top-trader ratios, HTX elite ratios, Bitget account and position ratios) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes. Without symbol, the 10 most traded perps and the newest 24 points of each CVD series; pass symbol, limit or cvd_points for more.",
+      "Call this when the user asks about the long/short ratio, whether retail or top traders are net long or short, the taker buy/sell ratio, or CVD (cumulative volume delta) for a perpetual. Returns exchange-published statistics for the 30 most traded Binance USDT perps on every perpetual venue the positioning board records (Binance global and top-trader ratios, Bybit share long, OKX ratios and taker volume, Gate account and top-trader ratios, HTX elite ratios, Bitget account and position ratios) and CVD series for BTC, ETH and SOL; refreshed every 15 minutes. Without symbol, the 10 most traded perps and the newest 24 points of each CVD series; pass symbol, limit or cvd_points for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,24}$/).optional().describe("One Binance symbol, e.g. BTCUSDT"),
       limit: z.coerce.number().int().min(1).max(30).optional().describe("Optional. Perps without symbol, most traded first (default 10, up to 30)."),
       cvd_points: z.coerce.number().int().min(1).max(288).optional().describe("Optional. Newest points per CVD series (1h and 5m); default 24 without symbol, every point with one."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ symbol, limit, cvd_points }: { symbol?: string; limit?: number; cvd_points?: number }) => {
+  async ({ symbol, limit, cvd_points, detail }: { symbol?: string; limit?: number; cvd_points?: number; detail?: Detail }) => {
     try {
       const path = `/api/public/positioning${symbol ? `?symbol=${encodeURIComponent(symbol)}` : ""}`;
       const data = await fetchJson(path);
-      const points = cvd_points ?? (symbol ? undefined : 24);
-      if (symbol && points === undefined) return ok(withProvenance(data, path));
-      return ok(compact(data, path, (rec, t) => {
-        if (!symbol) rec.rows = t.head(rec.rows, limit ?? 10, "rows", "pass symbol, or limit up to 30");
+      const c = wantsCompact(detail);
+      const points = cvd_points ?? (symbol ? (c ? 24 : undefined) : c ? 12 : 24);
+      if (wantsFull(detail) || (symbol && points === undefined)) return ok(withProvenance(data, path));
+      return okDetail("get_positioning", detail, compact(data, path, (rec, t) => {
+        if (!symbol) rec.rows = t.head(rec.rows, limit ?? (c ? 6 : 10), "rows", "pass symbol, or limit up to 30");
         if (points !== undefined && isRec(rec.cvd)) {
           const kept: Record<string, number> = {};
           const total: Record<string, number> = {};
@@ -1635,17 +1738,18 @@ server.registerTool(
   {
     title: "Desk notes: short dated observations the ByKaranteli desk wrote from its own recorded derivatives data",
     description:
-      "Call this when the user asks what happened in crypto derivatives today or on a date, what the desk observed, what moved in funding, open interest, liquidations, options, ETF flows or exchange premiums, or wants a dated, quotable sentence with its number and time. Returns the desk's notes newest first: each is one observation written by the desk writer (an AI model) from the platform's own recorded data and checked against it before publishing, with its publish time in UTC, the card's data time, the desk's 0 to 10 news value, the board it read from, the coins it names and its permanent URL. Information about the data, never advice. Default the newest 25 notes of the last 24 hours (count says how many came back; limit up to 100 for more); pass day for one UTC day, since for a window up to 7 days back (50 notes unless limit says otherwise), type for one card type (funding-arb, liqmap-btc, event-liq-burst, ...), lang for zh, ru or ko text.",
+      "Call this when the user asks what happened in crypto derivatives today or on a date, what the desk observed, what moved in funding, open interest, liquidations, options, ETF flows or exchange premiums, or wants a dated, quotable sentence with its number and time. Returns the desk's notes newest first: each is one observation written by the desk writer (an AI model) from the platform's own recorded data and checked against it before publishing, with its publish time in UTC, the card's data time, the desk's 0 to 10 news value, the board it read from, the coins it names and its permanent URL. Information about the data, never advice. Default the newest 25 notes of the last 24 hours (count says how many came back; limit up to 100 for more); pass day for one UTC day, since for a window up to 7 days back (50 notes unless limit says otherwise), type for one card type (funding-arb, liqmap-btc, event-liq-burst, ...), lang for zh, ru or ko text. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       day: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("One UTC day, YYYY-MM-DD"),
       since: z.string().trim().max(40).optional().describe("ISO time; notes published at or after it, at most 7 days back (ignored with day)"),
       type: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{0,60}$/).optional().describe("One card type, e.g. funding-arb, liqmap-btc, event-liq-burst"),
       lang: z.enum(["en", "zh", "ru", "ko"]).optional().describe("Text language (default en); a note without that translation comes back in English"),
       limit: z.number().int().min(1).max(100).optional().describe("Notes to return, 1..100 (default 25 for the last 24 hours, 50 with day or since)"),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ day, since, type, lang, limit }: { day?: string; since?: string; type?: string; lang?: string; limit?: number }) => {
+  async ({ day, since, type, lang, limit, detail }: { day?: string; since?: string; type?: string; lang?: string; limit?: number; detail?: Detail }) => {
     try {
       const q = new URLSearchParams();
       if (day) q.set("day", day);
@@ -1654,10 +1758,11 @@ server.registerTool(
       if (lang && lang !== "en") q.set("lang", lang);
       /* 0.36.1: a day of forty notes answered 47,000 characters without arguments; the first page is 25. */
       if (limit) q.set("limit", String(limit));
-      else if (!day && !since) q.set("limit", "25");
+      else if (wantsCompact(detail)) q.set("limit", "10");
+      else if (!day && !since && !wantsFull(detail)) q.set("limit", "25");
       const qs = q.toString();
       const path = `/api/public/desk${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      return okDetail("get_desk_notes", detail, withProvenance(await fetchJson(path), path));
     } catch (err) {
       return fail(err);
     }
@@ -1669,15 +1774,16 @@ server.registerTool(
   {
     title: "Turkey Premium Index: what lira buyers pay above the world price, with TRY reference prices from Turkish venues",
     description:
-      "Call this when the user asks about Bitcoin, Ether or USDT prices in Turkish lira, the Turkey premium, the USDT/TRY rate or dollar premium in Turkey, or which Turkish exchanges (BtcTurk, Bitlo, CoinTR, OKX TR, Binance TR, Bybit TR, Bitexen; KuCoin TR contributes the USDT pairs only) trade above or below the global price. Returns the live board: the Turkey Premium Index (what a lira buyer pays for bitcoin against the global dollar price at the official exchange rate, in bps) with its dollar leg and crypto leg, a 0-100 score (50 = world price) and regime, 24h and 7d averages and the same-sign streak; then five reference prices (median of eligible order books), per-venue book status, spread, depth and each venue's implied premium. Pass pair and history_days for 15-minute history of one pair. Without pair, the daily rows cover the last 7 days; pass pair, or daily_days (up to 30) for more.",
+      "Call this when the user asks about Bitcoin, Ether or USDT prices in Turkish lira, the Turkey premium, the USDT/TRY rate or dollar premium in Turkey, or which Turkish exchanges (BtcTurk, Bitlo, CoinTR, OKX TR, Binance TR, Bybit TR, Bitexen; KuCoin TR contributes the USDT pairs only) trade above or below the global price. Returns the live board: the Turkey Premium Index (what a lira buyer pays for bitcoin against the global dollar price at the official exchange rate, in bps) with its dollar leg and crypto leg, a 0-100 score (50 = world price) and regime, 24h and 7d averages and the same-sign streak; then five reference prices (median of eligible order books), per-venue book status, spread, depth and each venue's implied premium. Pass pair and history_days for 15-minute history of one pair. Without pair, the daily rows cover the last 7 days; pass pair, or daily_days (up to 30) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       pair: z.string().trim().toUpperCase().regex(/^(BTC-TRY|ETH-TRY|USDT-TRY|BTC-USDT|ETH-USDT)$/).optional().describe("Pair: BTC-TRY, ETH-TRY, USDT-TRY, BTC-USDT or ETH-USDT"),
       history_days: z.number().int().min(1).max(30).optional().describe("Include 15-minute index history for the pair, 1..30 days"),
       daily_days: z.coerce.number().int().min(1).max(30).optional().describe("Optional. Days of daily rows, newest first (default 7 without pair, every recorded day with one)."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ pair, history_days, daily_days }: { pair?: string; history_days?: number; daily_days?: number }) => {
+  async ({ pair, history_days, daily_days, detail }: { pair?: string; history_days?: number; daily_days?: number; detail?: Detail }) => {
     try {
       const q = new URLSearchParams();
       if (pair) q.set("pair", pair);
@@ -1685,14 +1791,33 @@ server.registerTool(
       const qs = q.toString();
       const path = `/api/public/turkey-premium${qs ? `?${qs}` : ""}`;
       const data = await fetchJson(path);
-      const wantDays = daily_days ?? (pair ? undefined : 7);
-      if (wantDays === undefined) return ok(withProvenance(data, path));
-      return ok(compact(data, path, (rec, t) => {
-        const daily = list(rec.daily);
-        const keep = newestDates(daily, wantDays);
-        const kept = daily.filter((r) => isRec(r) && keep.has(String(r.date)));
-        t.note("daily", kept.length, daily.length, "pass pair, or daily_days up to 30");
-        rec.daily = kept;
+      const c = wantsCompact(detail);
+      const wantDays = daily_days ?? (pair ? (c ? 3 : undefined) : c ? 3 : 7);
+      if (wantsFull(detail)) return ok(withProvenance(data, path));
+      if (wantDays === undefined && !c) return ok(withProvenance(data, path));
+      return okDetail("get_turkey_premium", detail, compact(data, path, (rec, t) => {
+        if (wantDays !== undefined) {
+          const daily = list(rec.daily);
+          const keep = newestDates(daily, wantDays);
+          const kept = daily.filter((r) => isRec(r) && keep.has(String(r.date)));
+          t.note("daily", kept.length, daily.length, "pass pair, or daily_days up to 30");
+          rec.daily = kept;
+        }
+        if (c) {
+          /* The 15-minute history (history.points) runs oldest first: the newest 24 points are its tail. */
+          if (isRec(rec.history) && Array.isArray(rec.history.points) && rec.history.points.length > 24) {
+            const points = rec.history.points;
+            rec.history = { ...rec.history, points: points.slice(-24) };
+            t.note("history.points", 24, points.length, 'pass detail \"full\" for every point');
+          }
+          if (isRec(rec.pairs)) {
+            const pairs: Rec = {};
+            for (const [key, value] of Object.entries(rec.pairs)) {
+              pairs[key] = isRec(value) ? { ...value, venues: t.head(value.venues, 5, `pairs.${key}.venues`, 'pass detail \"full\" for every venue') } : value;
+            }
+            rec.pairs = pairs;
+          }
+        }
       }));
     } catch (err) {
       return fail(err);
@@ -1935,20 +2060,25 @@ server.registerTool(
   {
     title: "Coverage registry: which venues and data types we collect, how, and how fresh",
     description:
-      "Call this when the user asks which exchanges sit behind a ByKaranteli number, whether a feed is complete or sampled, since when a venue is collected, or how fresh the data is. Returns the live coverage registry: liquidation feeds per venue with kind and last record, snapshot feeds per venue and market, funding arbitrage legs, positioning sources, whale tape, spot minutes and the Hyperliquid whale scan with freshness. snapshots[].country is the jurisdiction only when the venue states one; it is null for most venues, so do not read null as unknown risk. By default the first 30 snapshot feeds, English notes only and no per-venue matrix cells; pass detail=true for the full registry.",
+      "Call this when the user asks which exchanges sit behind a ByKaranteli number, whether a feed is complete or sampled, since when a venue is collected, or how fresh the data is. Returns the live coverage registry: liquidation feeds per venue with kind and last record, snapshot feeds per venue and market, funding arbitrage legs, positioning sources, whale tape, spot minutes and the Hyperliquid whale scan with freshness. snapshots[].country is the jurisdiction only when the venue states one; it is null for most venues, so do not read null as unknown risk. By default the first 30 snapshot feeds, English notes only and no per-venue matrix cells; pass detail \"full\" for the full registry. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
-      detail: z.boolean().optional().describe("Optional. true: every snapshot feed, the zh, ru and ko notes and the venue by product matrix cells (default false)."),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ detail }: { detail?: boolean }) => {
+  async ({ detail }: { detail?: Detail }) => {
     try {
       const path = "/api/public/coverage";
       const data = await fetchJson(path);
-      if (detail) return ok(withProvenance(data, path));
-      const more = "pass detail=true for the full registry";
-      return ok(compact(data, path, (rec, t) => {
-        rec.snapshots = t.head(rec.snapshots, 30, "snapshots", more);
+      if (wantsFull(detail)) return ok(withProvenance(data, path));
+      const more = 'pass detail \"full\" for the full registry';
+      return okDetail("get_coverage", detail, compact(data, path, (rec, t) => {
+        const c = wantsCompact(detail);
+        rec.snapshots = t.head(rec.snapshots, c ? 8 : 30, "snapshots", more);
+        if (c) {
+          rec.orderbook_depth = t.head(rec.orderbook_depth, 8, "orderbook_depth", more);
+          rec.funding_arbitrage = t.head(rec.funding_arbitrage, 10, "funding_arbitrage", more);
+        }
         const liq = list(rec.liquidations);
         let translated = 0;
         rec.liquidations = liq.map((r) => {
@@ -2052,6 +2182,7 @@ async function account(method: "GET" | "POST" | "DELETE", path: string, body?: u
       headers: {
         accept: "application/json",
         "user-agent": USER_AGENT,
+        ...extraHeaders(),
         authorization,
         ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
