@@ -117,7 +117,7 @@ Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). The server spe
 | `get_altseason` | "Is it altseason?", "What is the altcoin season index?" |
 | `get_metric_context` | "Is today's funding extreme historically?", "Where does this reading sit in its distribution?" |
 | `get_quantum_exposure` | "How much Bitcoin is quantum-vulnerable?", "What is the P2PK exposure?" |
-| `get_liqmap` | "Where are the BTC liquidation clusters?", "Where would leveraged longs get liquidated?" |
+| `get_liqmap` | "Where are the BTC liquidation clusters?", "Where would leveraged longs get liquidated?", "Where are the gold (XAU) or crude oil (CL) liquidation clusters?" |
 | `get_market_profile` | "Where is the BTC point of control today?", "What was yesterday's value area?", "Which naked POCs are still untested?" |
 | `get_options_chain` | "How did BTC open interest move by strike today?", "Where is ETH ATM IV hour by hour?", "Which expiry gained the most open interest in 24h?" |
 | `get_hl_positions` | "Where do Hyperliquid whales get liquidated on BTC?", "How much tracked notional sits below price?", "Does the model agree with the tracked positions?" |

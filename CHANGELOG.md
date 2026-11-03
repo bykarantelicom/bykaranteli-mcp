@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.1] - 2026-11-03
+
+68 tools. Text only, no behaviour change.
+
+### Changed
+
+- `get_liqmap`: the description and the `symbol` parameter now name the stock and commodity perps the map covers (XAU gold, XAG silver, CL WTI crude, BZ Brent, NATGAS, COPPER, XPT platinum, XPD palladium, stocks by ticker), so an assistant asked for the gold or oil liquidation map picks the tool and the right contract code.
+
 ## [1.1.0] - 2026-10-24
 
 68 tools.

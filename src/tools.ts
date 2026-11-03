@@ -1494,7 +1494,7 @@ server.registerTool(
   {
     title: "LiqMap: estimated liquidation clusters with real prints overlaid",
     description:
-      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). On the Free plan the 24h view; on Builder and higher plans every timeframe from 1h to 30d. By default the 30 real levels nearest the price and the 30 largest real prints; pass detail \"full\" for all of them. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+      "Call this when the user asks where liquidation clusters or liquidity pools sit for a perpetual, where leveraged longs/shorts would get liquidated, or for a liquidation heatmap reading. Covers the crypto perps and the stock and commodity perps: gold is XAU, silver XAG, WTI crude oil CL, Brent BZ, natural gas NATGAS, copper COPPER, platinum XPT, palladium XPD, stocks their ticker (TSLA, NVDA). Returns the LiqMap snapshot for one symbol: modeled liquidation levels by price, zone aggregates and real liquidation prints from every liquidation venue ByKaranteli counts (listed on bykaranteli.com/coverage). On the Free plan the 24h view; on Builder and higher plans every timeframe from 1h to 30d. By default the 30 real levels nearest the price and the 30 largest real prints; pass detail \"full\" for all of them. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       symbol: z
         .string()
@@ -1502,7 +1502,7 @@ server.registerTool(
         .toUpperCase()
         .regex(/^[A-Z0-9]{2,20}$/)
         .optional()
-        .describe("Symbol like BTCUSDT (bare BTC accepted). Default BTCUSDT."),
+        .describe("Symbol like BTCUSDT (bare BTC accepted). Commodity perps use the contract code: XAU gold, XAG silver, CL WTI crude, BZ Brent, NATGAS, COPPER, XPT platinum, XPD palladium; stocks their ticker (TSLA). Default BTCUSDT."),
       timeframe: z
         .enum(["1h", "4h", "12h", "24h", "3d", "1w", "30d"])
         .optional()
