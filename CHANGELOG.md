@@ -2,6 +2,19 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.3] - 2026-11-09
+
+68 tools. Rounding and text, no tool change.
+
+### Changed
+
+- Compact answers (`detail: "compact"`, and the capped answers of the AI desk on bykaranteli.com) round every non-integer figure at the source the way the desk has rounded them since 25 Oct 2026: a number at or above 1 keeps four fractional digits, a smaller one four significant digits after its leading zeros (-2.277861334108239 becomes -2.2779, 0.000123456789 becomes 0.0001235). Before, `toPrecision(6)` applied, and a model told to copy figures as written copied a 16-digit percent into an answer. A rule's `significant` keeps the older form.
+- The notes of `get_liquidations` and `get_liquidation_leaderboard` describe the floor per venue feed and point at `get_coverage` for the counted venue list; they no longer read as if Binance were the only source.
+
+### Dependencies
+
+- zod `^4.6.7` (GHSA-mrhx-c7xc-m3w5), the range the site itself runs.
+
 ## [1.1.2] - 2026-11-09
 
 68 tools. Text only, no behaviour change.

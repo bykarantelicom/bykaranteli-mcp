@@ -4,8 +4,10 @@
  *     model that only needs the headline figures;
  *   - the AI desk on bykaranteli.com, which runs the same tools in process and caps every tool answer at a fixed
  *     number of characters before the model reads it (compactToolText).
- * Nothing here recomputes a figure: lists are cut in the route's own order, numbers are rounded to a few significant
- * digits, long free text is shortened, and every cut is named in `trimmed` the way the default pages name theirs.
+ * Nothing here recomputes a figure: lists are cut in the route's own order, numbers are rounded at the source (1.1.3:
+ * four fractional digits at or above 1, four significant digits below it, the rule the AI desk applies before a model
+ * reads a tool answer; a rule's `significant` keeps the older toPrecision form), long free text is shortened, and
+ * every cut is named in `trimmed` the way the default pages name theirs.
  */
 
 export type CompactCut = { field: string; returned: number; total: number; more: string };
@@ -23,7 +25,8 @@ export type CompactRule = {
   keepKeys?: readonly string[];
   /** Longest string kept (default 300 characters); longer ones are cut with a marker. */
   maxString?: number;
-  /** Significant digits kept on non-integer numbers (default 6). */
+  /** Significant digits kept on non-integer numbers (toPrecision). Without it the desk rule applies (1.1.3): a number at
+   * or above 1 keeps four fractional digits, a smaller one four significant digits after its leading zeros. */
   significant?: number;
   /** The `more` text of every cut (default: the full answer parameter). */
   more?: string;
@@ -44,7 +47,21 @@ function cutString(v: string, max: number): string {
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => Boolean(v) && typeof v === "object" && !Array.isArray(v);
 
-function roundNumber(n: number, significant: number): number {
+const FRACTION_DIGITS = 4;
+const MAX_LEADING_ZEROS = 96; // toFixed accepts at most 100 digits
+
+/** -2.277861334108239 -> -2.2779, 0.000123456789 -> 0.0001235, 80603.123456 -> 80603.1235; integers stay as they are
+ *  (the desk's own pass, web/src/lib/ask/round-decimals.ts, applies the same rule to a tool text before the model reads it). */
+export function roundToolNumber(n: number): number {
+  if (!Number.isFinite(n) || Number.isInteger(n)) return n;
+  const abs = Math.abs(n);
+  const lead = abs >= 1 ? 0 : Math.min(MAX_LEADING_ZEROS, Math.max(0, -Math.floor(Math.log10(abs)) - 1));
+  const rounded = Number(n.toFixed(lead + FRACTION_DIGITS));
+  return Number.isFinite(rounded) ? rounded : n;
+}
+
+function roundNumber(n: number, significant: number | undefined): number {
+  if (significant === undefined) return roundToolNumber(n);
   if (!Number.isFinite(n) || Number.isInteger(n)) return n;
   const r = Number(n.toPrecision(significant));
   return Number.isFinite(r) ? r : n;
@@ -55,7 +72,7 @@ export function compactValue(value: unknown, rule: CompactRule = {}): { value: u
   const maxItems = rule.maxItems ?? 10;
   const keep = new Set([...KEEP_KEYS, ...(rule.keepKeys ?? [])]);
   const maxString = rule.maxString ?? 300;
-  const significant = rule.significant ?? 6;
+  const significant = rule.significant;
   const more = rule.more ?? DEFAULT_MORE;
   const cuts: CompactCut[] = [];
   const noted = new Set<string>();

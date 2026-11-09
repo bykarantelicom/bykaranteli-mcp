@@ -9,7 +9,7 @@ test("compactValue cuts lists, rounds numbers, shortens strings and names every 
   const { value, cuts } = compactValue({ rows, legs: [1, 2, 3, 4], note: "y".repeat(500), memo: "y".repeat(500), provenance: { kept: "z".repeat(500) }, grid: [[1, 2, 3], [4, 5, 6]] }, { maxItems: 10, fields: { legs: 2 }, drop: ["grid"] });
   assert.equal(value.rows.length, 10);
   assert.equal(value.legs.length, 2);
-  assert.equal(value.rows[0].price, 61234.6);
+  assert.equal(value.rows[0].price, 61234.5679);
   assert.equal(value.rows[0].text.length, 301);
   assert.equal(value.note.length, 500, "note is a route's field definitions, never shortened");
   assert.equal(value.memo.length, 301);
@@ -37,8 +37,16 @@ test("compactValue leaves an answer that needs no cut untouched and keeps intege
   const { value, cuts } = compactValue(input);
   assert.deepEqual(cuts, []);
   assert.equal(value.n, 1234567890123);
-  assert.equal(value.f, 0.000123457);
+  assert.equal(value.f, 0.0001235);
   assert.equal(value.trimmed, undefined);
+});
+
+test("numbers are rounded the way the desk rounds them; a rule's significant keeps the toPrecision form", () => {
+  assert.equal(compactValue({ p: -2.277861334108239 }).value.p, -2.2779);
+  assert.equal(compactValue({ p: 80603.123456 }).value.p, 80603.1235);
+  assert.equal(compactValue({ p: 0.000123456789 }).value.p, 0.0001235);
+  assert.equal(compactValue({ p: 7 }).value.p, 7);
+  assert.equal(compactValue({ p: 0.000123456789 }, { significant: 6 }).value.p, 0.000123457);
 });
 
 test("compactToolText returns the text as is under the cap and a complete JSON document above it", () => {
