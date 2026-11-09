@@ -31,8 +31,15 @@ const MAX_TOOL_INPUT_ELEMENTS = 2_000;
  * 0.x releases served it; a client that opens with a 2026-07-28 per-request envelope (`server/discover` is the
  * modern probe) is served on that revision, with the same tools. The factory is called once per connection, plus
  * once for a discarded probe instance, so it registers the tools afresh each time. */
+/* initialize.instructions (1.1.2, owner rule 2026-11-07): the one paragraph a client model reads before its first call,
+ * the same text the hosted endpoint sends (web/src/lib/mcp-hosted.ts HOSTED_INSTRUCTIONS; ops/mcp-release-check.py
+ * compares the two). Advice a well-behaved agent follows and relays to its user, never enforcement: the plan's rate
+ * and monthly figures refuse on the server, and a client's provider does not police our terms. */
+const INSTRUCTIONS =
+  "ByKaranteli serves recorded crypto derivatives market data (liquidations, funding, open interest, options, ETF flows, positioning, order flow); every market-data tool is read-only, and the account tools that change alerts or the watchlist are marked as writes. A free key is for evaluation and personal scripts; a bot, a dashboard or a polling agent that runs continuously takes a plan (Terminal, Builder or Business by use). Call a tool no more often than its data refreshes (the daily brief once a day). A 429 answer carries retry-after: wait that long before calling again instead of retrying.";
+
 function buildServer(): McpServer {
-  const server = new McpServer({ name: "bykaranteli", version: VERSION }, { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS });
+  const server = new McpServer({ name: "bykaranteli", version: VERSION }, { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS, instructions: INSTRUCTIONS });
   registerByKaranteliTools(server, { version: VERSION });
   return server;
 }

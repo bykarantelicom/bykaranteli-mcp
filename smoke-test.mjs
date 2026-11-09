@@ -54,6 +54,12 @@ const init = await rpc("initialize", {
   clientInfo: { name: "smoke-test", version: "0.0.0" },
 });
 check("initialize", init.result?.serverInfo?.name === "bykaranteli", JSON.stringify(init.result?.serverInfo));
+/* 1.1.2: the initialize answer carries the one-paragraph instructions (the hosted endpoint's text since 7 Nov 2026). */
+check(
+  "initialize carries instructions",
+  typeof init.result?.instructions === "string" && init.result.instructions.includes("A free key is for evaluation") && init.result.instructions.includes("retry-after"),
+  `${(init.result?.instructions ?? "").length} chars`,
+);
 notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});

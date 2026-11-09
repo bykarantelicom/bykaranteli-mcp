@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.2] - 2026-11-09
+
+68 tools. Text only, no behaviour change.
+
+### Added
+
+- The server now sends `instructions` in its `initialize` answer: one paragraph a client model reads before its first call. It says that every market-data tool is read-only and the account tools that write are marked, that a free key is for evaluation and personal scripts while a bot, a dashboard or a polling agent that runs continuously takes a plan, that a tool is called no more often than its data refreshes, and that a 429 answer carries `retry-after`. The hosted endpoint has sent the same paragraph since 7 Nov 2026; the release check compares the two.
+
 ## [1.1.1] - 2026-11-03
 
 68 tools. Text only, no behaviour change.
