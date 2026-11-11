@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.4] - 2026-11-11
+
+68 tools. Text only, no behaviour change.
+
+### Changed
+
+- `get_whale_tape` describes its rows as sweeps: each row is one aggressive market sweep, the same-side prints on a symbol summed, one row per burst. The title and description used to call each row a print. The tape has always summed prints over a one-second window; since 11 Nov 2026 a row holds the whole burst. The hosted endpoint sends the same text.
+
 ## [1.1.3] - 2026-11-09
 
 68 tools. Rounding and text, no tool change.

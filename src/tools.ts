@@ -1323,9 +1323,9 @@ server.registerTool(
 server.registerTool(
   "get_whale_tape",
   {
-    title: "Whale tape: $1M+ aggressive prints with 24h buy share",
+    title: "Whale tape: $1M+ aggressive sweeps with 24h buy share",
     description:
-      "Call this when the user asks about whale trades, large market orders, or whether big players are buying or selling right now. Returns recent $1M+ aggressive prints recorded live from our own sockets and 24h aggregates with the buy share.",
+      "Call this when the user asks about whale trades, large market orders, or whether big players are buying or selling right now. Returns recent $1M+ aggressive market sweeps recorded live from our own sockets (each row is one sweep: same-side prints on a symbol summed, one row per burst) and 24h aggregates with the buy share.",
     inputSchema: {},
     annotations: READ_ONLY,
   },
