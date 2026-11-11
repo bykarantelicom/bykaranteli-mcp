@@ -8,7 +8,7 @@ Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Cha
 
 ### Changed
 
-- `get_whale_tape` describes its rows as sweeps: each row is one aggressive market sweep, the same-side prints on a symbol summed, one row per burst. The title and description used to call each row a print. The tape has always summed prints over a one-second window; since 11 Nov 2026 a row holds the whole burst. The hosted endpoint sends the same text.
+- `get_whale_tape` describes its rows as sweeps: each row is one aggressive market sweep, the same-side prints on a symbol summed over a short rolling window (a long burst continues in the next row). The title and description used to call each row a print. The tape has always summed prints over a one-second window; since 11 Nov 2026 a row holds the whole burst. The hosted endpoint sends the same text.
 
 ## [1.1.3] - 2026-11-09
 
