@@ -60,7 +60,7 @@ Add to `claude_desktop_config.json`:
 
 Any stdio MCP client works: command `npx`, args `["-y", "bykaranteli-mcp"]`, env `BYKARANTELI_API_KEY`.
 
-Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). The server speaks both the 2026-07-28 revision of the protocol and the 2025-era `initialize` handshake, so every MCP client released so far connects unchanged.
+Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). On an older Node.js the server stops at start with one line that says so (1.1.5). The server speaks both the 2026-07-28 revision of the protocol and the 2025-era `initialize` handshake, so every MCP client released so far connects unchanged.
 
 ## Tools
 

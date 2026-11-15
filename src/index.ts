@@ -6,18 +6,30 @@
  * (docs: https://bykaranteli.com/developers). All data is Binance USDT-M
  * perpetuals unless a tool says otherwise. Every response carries a
  * generated-at timestamp; quote it when citing values.
+ *
+ * The Node.js version check is the first thing this file does (1.1.5): on a runtime older than engines.node the
+ * server says one line on stderr and exits 1, instead of failing inside a dependency's import. Static imports load
+ * before the module body runs, so this file imports nothing statically beyond node:module and ./node-version.js;
+ * everything else comes through import() after the check (test/entry.test.mjs holds that set).
  */
 
 import { createRequire } from "node:module";
 
-import { McpServer } from "@modelcontextprotocol/server";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { nodeVersionProblem } from "./node-version.js";
 
-import { registerByKaranteliTools } from "./tools.js";
-
-// Single source of truth for the version: package.json ships in the tarball
+// Single source of truth for the version and the supported Node.js range: package.json ships in the tarball
 // and sits one level above both src/ and dist/.
-const { version: VERSION } = createRequire(import.meta.url)("../package.json") as { version: string };
+const { version: VERSION, engines } = createRequire(import.meta.url)("../package.json") as { version: string; engines?: { node?: string } };
+
+const problem = nodeVersionProblem(process.versions.node, engines?.node ?? "");
+if (problem) {
+  console.error(problem);
+  process.exit(1);
+}
+
+const { McpServer } = await import("@modelcontextprotocol/server");
+const { serveStdio } = await import("@modelcontextprotocol/server/stdio");
+const { registerByKaranteliTools } = await import("./tools.js");
 
 const BASE_URL = (process.env.BYKARANTELI_BASE_URL ?? "https://bykaranteli.com").replace(/\/+$/, "");
 
@@ -38,7 +50,7 @@ const MAX_TOOL_INPUT_ELEMENTS = 2_000;
 const INSTRUCTIONS =
   "ByKaranteli serves recorded crypto derivatives market data (liquidations, funding, open interest, options, ETF flows, positioning, order flow); every market-data tool is read-only, and the account tools that change alerts or the watchlist are marked as writes. A free key is for evaluation and personal scripts; a bot, a dashboard or a polling agent that runs continuously takes a plan (Terminal, Builder or Business by use). Call a tool no more often than its data refreshes (the daily brief once a day). A 429 answer carries retry-after: wait that long before calling again instead of retrying.";
 
-function buildServer(): McpServer {
+function buildServer(): InstanceType<typeof McpServer> {
   const server = new McpServer({ name: "bykaranteli", version: VERSION }, { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS, instructions: INSTRUCTIONS });
   registerByKaranteliTools(server, { version: VERSION });
   return server;

@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.5] - 2026-11-15
+
+68 tools. Start-up only, no tool change.
+
+### Changed
+
+- On a Node.js older than 20 the server stops at start with one line on stderr that names the Node.js it needs and the one it runs on, and exits with code 1. Before, the start failed with an import error from inside a dependency. On Node.js 20 and newer the server behaves exactly as before.
+
 ## [1.1.4] - 2026-11-11
 
 68 tools. Text only, no behaviour change.
