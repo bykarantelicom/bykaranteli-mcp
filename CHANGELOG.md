@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.6] - 2026-11-18
+
+68 tools. Text only, no behaviour change.
+
+### Changed
+
+- `get_hl_whales` names no universe size: the title and the description say the largest accounts by equity. They used to say the top 300; the scan has covered the 1,000 largest accounts by equity since 30 Sep 2026, and the tool has returned that board since then. The hosted endpoint sends the same text.
+
 ## [1.1.5] - 2026-11-15
 
 68 tools. Start-up only, no tool change.
