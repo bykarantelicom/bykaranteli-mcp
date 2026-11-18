@@ -1650,9 +1650,9 @@ server.registerTool(
 server.registerTool(
   "get_hl_whales",
   {
-    title: "Hyperliquid whale tracker: top-300 accounts, long vs short, positions, changes",
+    title: "Hyperliquid whale tracker: the largest accounts by equity, long vs short, positions, changes",
     description:
-      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the 300 largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes. Without coin, the 30 largest coins and positions; pass coin, or limit (up to 200) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes. Without coin, the 30 largest coins and positions; pass coin, or limit (up to 200) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
       coin: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,24}$/).optional().describe("One coin, e.g. BTC"),
       events: z.boolean().optional().describe("Include the last 200 position change events"),
