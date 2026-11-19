@@ -36,9 +36,25 @@ Step-by-step guide for beginners: https://bykaranteli.com/guide/connect
 
 ### Claude Code
 
+Hosted, with sign-in (nothing to install, no key to copy): add the server, then type `/mcp` in Claude Code, pick
+bykaranteli and choose Authenticate. A bykaranteli.com window opens; sign in or create a free account and press Allow.
+
+```bash
+claude mcp add --transport http bykaranteli https://mcp.bykaranteli.com
+```
+
+Or run the package locally with your account key ([get a free key](https://bykaranteli.com/register?utm_source=github&utm_medium=readme)):
+
 ```bash
 claude mcp add bykaranteli -e BYKARANTELI_API_KEY=bk_... -- npx -y bykaranteli-mcp
 ```
+
+### Cursor and VS Code
+
+One click adds the hosted server; the editor asks you to sign in to bykaranteli.com, where a free account is made in
+the same window.
+
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=bykaranteli&config=eyJ1cmwiOiJodHRwczovL21jcC5ieWthcmFudGVsaS5jb20ifQ%3D%3D) [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF)](https://vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522bykaranteli%2522%252C%2522type%2522%253A%2522http%2522%252C%2522url%2522%253A%2522https%253A%252F%252Fmcp.bykaranteli.com%2522%257D)
 
 ### Claude Desktop
 
@@ -56,9 +72,9 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
-### Cursor / other MCP clients
+### Other MCP clients
 
-Any stdio MCP client works: command `npx`, args `["-y", "bykaranteli-mcp"]`, env `BYKARANTELI_API_KEY`.
+Any stdio MCP client works (Cursor and VS Code too, with your key): command `npx`, args `["-y", "bykaranteli-mcp"]`, env `BYKARANTELI_API_KEY`.
 
 Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). On an older Node.js the server stops at start with one line that says so (1.1.5). The server speaks both the 2026-07-28 revision of the protocol and the 2025-era `initialize` handshake, so every MCP client released so far connects unchanged.
 
