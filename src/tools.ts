@@ -1650,11 +1650,11 @@ server.registerTool(
 server.registerTool(
   "get_hl_whales",
   {
-    title: "Hyperliquid whale tracker: the largest accounts by equity, long vs short, positions, changes",
+    title: "Hyperliquid whale tracker: the large accounts, long vs short, positions, changes",
     description:
-      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of the largest accounts by equity (scanned every 5 minutes, addresses only) and with events the last 200 position changes. Without coin, the 30 largest coins and positions; pass coin, or limit (up to 200) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+      "Call this when the user asks what Hyperliquid whales are doing, whether the biggest Hyperliquid accounts are net long or short a coin, for the largest open positions with liquidation prices, or what large accounts just opened, closed or flipped. Returns the live board of Hyperliquid's large accounts (every account whose open perpetual positions add up to a large sum, found in the venue's public fill record, together with the largest accounts by equity on its public leaderboard; positions are read on the main dex and on the builder-deployed dexes (markets such as xyz:NVDA), the largest accounts every 5 minutes, the others every 15 minutes or as fast as the venue's request limit allows; addresses only) and with events the last 200 position changes. Without coin, the 30 largest coins and positions; pass coin, or limit (up to 200) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
     inputSchema: {
-      coin: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,24}$/).optional().describe("One coin, e.g. BTC"),
+      coin: z.string().trim().regex(/^(?:[A-Za-z0-9]{1,10}:)?[A-Za-z0-9]{1,24}$/).optional().describe("One coin as Hyperliquid names it, e.g. BTC, kPEPE, xyz:NVDA (a builder-deployed market carries its dex in front; any case)"),
       events: z.boolean().optional().describe("Include the last 200 position change events"),
       limit: z.coerce.number().int().min(1).max(200).optional().describe("Optional. Coins and positions without coin, largest first (default 30)."),
       detail: DETAIL,
@@ -1940,11 +1940,11 @@ server.registerTool(
 server.registerTool(
   "get_hl_positions",
   {
-    title: "Hyperliquid tracked positions: the liquidation price map of the largest accounts per coin, against the LiqMap model",
+    title: "Hyperliquid tracked positions: the liquidation price map of the large accounts per coin, against the LiqMap model",
     description:
-      "Call this when the user asks where Hyperliquid whales would be liquidated, how much tracked notional sits at each price, how the largest accounts lean on a coin, or how their liquidation prices compare with the LiqMap model. The universe is the largest accounts by equity on Hyperliquid's public leaderboard, scanned every five minutes; the levels are their own liquidation prices bucketed around the mark. hours returns the hourly archive of level totals.",
+      "Call this when the user asks where Hyperliquid whales would be liquidated, how much tracked notional sits at each price, how the large accounts lean on a coin, or how their liquidation prices compare with the LiqMap model. The universe is every account whose open perpetual positions add up to a large sum, found in the venue's public fill record, together with the largest accounts by equity on its public leaderboard; positions are read on the main dex and on the builder-deployed dexes (markets such as xyz:NVDA), the largest accounts every 5 minutes, the others every 15 minutes or as fast as the venue's request limit allows; the levels are their own liquidation prices bucketed around the mark. hours returns the hourly archive of level totals.",
     inputSchema: {
-      coin: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,24}$/).optional().describe("Coin as Hyperliquid names it, e.g. BTC, ETH, SOL (default BTC)"),
+      coin: z.string().trim().regex(/^(?:[A-Za-z0-9]{1,10}:)?[A-Za-z0-9]{1,24}$/).optional().describe("Coin as Hyperliquid names it, e.g. BTC, kPEPE, xyz:NVDA (default BTC; a builder-deployed market carries its dex in front; any case)"),
       hours: z.number().int().min(1).max(720).optional().describe("Hours of archive to return, 1..720 (default 24)"),
     },
     annotations: READ_ONLY,

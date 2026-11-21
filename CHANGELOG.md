@@ -2,6 +2,15 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.7] - 2026-11-21
+
+68 tools. Text and one input pattern.
+
+### Changed
+
+- `get_hl_whales` and `get_hl_positions` describe the wider Hyperliquid universe: every account whose open perpetual positions add up to a large sum, found in the venue's public fill record, together with the largest accounts by equity, read on the main dex and on the builder-deployed dexes. The largest accounts are read every 5 minutes, the others every 15 minutes or as fast as the venue's request limit allows. No universe size is named: it changes from scan to scan. The hosted endpoint sends the same text.
+- The `coin` input of both tools accepts a builder-deployed market with its dex in front (`xyz:NVDA`, in any case) and passes the name on as written; the API matches the case itself. Before, the input was upper-cased and refused a colon.
+
 ## [1.1.6] - 2026-11-18
 
 68 tools. Text only, no behaviour change.

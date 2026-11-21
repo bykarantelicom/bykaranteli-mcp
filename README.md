@@ -120,7 +120,7 @@ Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). On an older No
 | `get_network_health` | "Bitcoin hashrate, difficulty, fees, mempool right now?" |
 | `get_tradfi_board` | "TSLA perp funding rate? Which exchanges list NVDA perps? Is the stock session open?" |
 | `get_rsi_heatmap` | "Which coins are oversold on the daily? BTC RSI on 4h and 1w?" |
-| `get_hl_whales` | "Are Hyperliquid whales net long BTC? What did the biggest accounts just flip?" |
+| `get_hl_whales` | "Are Hyperliquid whales net long BTC? What did the large accounts just flip? Who holds xyz:NVDA?" |
 | `get_positioning` | "BTC long/short ratio on Binance? Are top traders net short ETH? CVD today?" |
 | `get_coverage` | "Which exchanges are behind your liquidation totals? How fresh is the data?" |
 | `get_orderbook_depth` | "Where is the biggest BTC bid wall? How deep is ETH within 2% on Coinbase vs Binance?" |
@@ -136,7 +136,7 @@ Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). On an older No
 | `get_liqmap` | "Where are the BTC liquidation clusters?", "Where would leveraged longs get liquidated?", "Where are the gold (XAU) or crude oil (CL) liquidation clusters?" |
 | `get_market_profile` | "Where is the BTC point of control today?", "What was yesterday's value area?", "Which naked POCs are still untested?" |
 | `get_options_chain` | "How did BTC open interest move by strike today?", "Where is ETH ATM IV hour by hour?", "Which expiry gained the most open interest in 24h?" |
-| `get_hl_positions` | "Where do Hyperliquid whales get liquidated on BTC?", "How much tracked notional sits below price?", "Does the model agree with the tracked positions?" |
+| `get_hl_positions` | "Where do Hyperliquid whales get liquidated on BTC?", "How much tracked notional sits below price?", "Where would xyz:GOLD longs get liquidated?", "Does the model agree with the tracked positions?" |
 | `get_venue_share` | "Which exchange had the most liquidations this week?", "How is perp open interest split by venue?" |
 | `get_tradfi_gaps` | "What did the TSLA perp do over the weekend?", "How big was the Monday open gap on NVDA?", "How far apart were the venues overnight?" |
 | `get_series` | "BTC open interest by hour for the last week?", "ETH funding on OKX since 1 September?", "Daily Coinbase premium this month?" (metric list, units and finest periods: <https://bykaranteli.com/api/series/metrics>) |
