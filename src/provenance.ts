@@ -45,6 +45,7 @@ const PAGE_FOR_STEM: Record<string, string> = {
   "/jupiter": "/jupiter-perps",
   "/market-profile": "/symbols",
   "/liquidation-leaderboard": "/liquidations",
+  "/hyperliquid-positions": "/hyperliquid-whales",
   "/hyperliquid-moves": "/hyperliquid-whales/moves",
   "/hyperliquid-liquidation-risk": "/hyperliquid-whales/near-liquidation",
 };

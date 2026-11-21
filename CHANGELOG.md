@@ -2,7 +2,7 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
-## [1.1.8] - 2026-11-22
+## [1.1.8] - 2026-11-21
 
 70 tools. Two new tools.
 
@@ -11,6 +11,10 @@ Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Cha
 - `get_hl_whale_moves`: the large Hyperliquid moves of the last 24 hours, one card per position: the latest change (opened, added, cut, closed, flipped), the wallet's behaviour label (one-sided, two-sided, new wallet; an address is never given a name), the open position with its liquidation price and the distance to it, or the estimated result once it ended, and the steps of the position so far. Every key reads the moves of $10M and more on one-sided accounts; moves from $1M and the filters (`coin`, `side`, `accounts`, `min_usd` below $10M) are part of Terminal and the plans above it. A Free key reads this feed 30 minutes late. Reads `/api/public/hyperliquid-moves`.
 - `get_hl_liquidation_risk`: the large Hyperliquid positions by the price move that reaches their liquidation price: the dollars within 5% and 10%, a ladder in steps of 1% and the positions nearest first. Rows of $10M and more on one-sided accounts are open to every key, the rows from $1M and the filters are part of Terminal and above; not delayed. Reads `/api/public/hyperliquid-liquidation-risk`.
 - Both take `detail` (`"compact"`, `"full"`); fifteen tools now do.
+
+### Fixed
+
+- `get_hl_positions`: the source page in its provenance is the whale tracker's page, `/hyperliquid-whales`; it named a page that does not exist.
 
 ## [1.1.7] - 2026-11-21
 
