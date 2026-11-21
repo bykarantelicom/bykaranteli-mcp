@@ -1963,6 +1963,94 @@ server.registerTool(
   },
 );
 
+/* The Hyperliquid board family (1.1.8, bykaranteli.com pending 2.157 block B, 2026-11-21): the large moves feed and the
+ * positions nearest to liquidation. The figures in the text are the web constants of lib/hl-board.ts, which this
+ * package cannot import: HL_BOARD_FREE_MIN_USD ($10M, the free line), HL_BOARD_PAID_MIN_USD ($1M, the paid line),
+ * HL_BOARD_FREE_API_DELAY_MS (30 minutes, a Free key on the feed), HL_BOARD_WINDOW_MS (24 hours), HL_BOARD_SIZE_STEPS,
+ * HL_BOARD_CARDS_MAX (96), HL_RISK_NEAR_PCT and HL_RISK_WIDE_PCT (5 and 10), HL_RISK_STEP_PCT and HL_RISK_SPAN_PCT
+ * (1 and 25), HL_RISK_ROWS_MAX (200). The hosted bridge (web lib/mcp-extra-tools.ts) builds the same text from the
+ * constants, and its parity test holds the two equal. */
+const HL_COIN = z.string().trim().max(40).regex(/^(?:[A-Za-z0-9]{1,10}:)?[A-Za-z0-9]{1,24}$/).optional().describe("One coin as Hyperliquid names it, e.g. BTC, HYPE, xyz:NVDA (a builder-deployed market carries its dex in front; any case). Terminal and above.");
+const HL_SIDE = z.enum(["long", "short"]).optional().describe("long or short. Terminal and above.");
+
+server.registerTool(
+  "get_hl_whale_moves",
+  {
+    title: "Hyperliquid large moves: one card per position, its steps, its distance to liquidation and the wallet's behaviour label",
+    description:
+      "Call this when the user asks what Hyperliquid's largest traders just did, which large positions were opened, added to, cut, closed or flipped in the last 24 hours, how a large position got where it is, or how far it is from liquidation. Returns one card per position whose latest change is worth min_usd or more: the move (kind, time, dollars, size), the wallet's behaviour label (one_sided or two_sided, measured from its own readings, and new_wallet for a young account; an address is never given a name), the open position with its liquidation price and distance_to_liq_pct, or the estimated result once it ended, and the steps of the position so far; totals sum every move of the view, positions_total counts the cards. Stock, index and commodity contracts on the builder-deployed markets are included. Every key reads the moves of $10M and more on one-sided accounts, fresh and complete; moves from $1M, coin, side and accounts are part of Terminal and the plans above it (plan.capped says a filter was asked and not applied). A Free key reads this feed 30 minutes late (plan.delayed_minutes); the page bykaranteli.com/hyperliquid-whales/moves is not delayed. Without limit, the newest 12 cards; pass limit (up to 96) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+    inputSchema: {
+      min_usd: z.number().int().min(1000000).max(30000000).optional().describe("Optional. The size line: 1000000, 5000000, 10000000 or 30000000 (default 10000000 on a Free key, 1000000 on Terminal and above; below 10000000 on Terminal and above only)."),
+      coin: HL_COIN,
+      side: HL_SIDE,
+      accounts: z.enum(["one_sided", "new", "all"]).optional().describe("one_sided (default: accounts that hold a direction), new (young wallets) or all. Terminal and above."),
+      limit: z.number().int().min(1).max(96).optional().describe("Optional. Cards, newest first (default 12, up to 96)."),
+      detail: DETAIL,
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ min_usd, coin, side, accounts, limit, detail }: { min_usd?: number; coin?: string; side?: "long" | "short"; accounts?: "one_sided" | "new" | "all"; limit?: number; detail?: Detail }) => {
+    try {
+      const q = new URLSearchParams();
+      if (min_usd !== undefined) q.set("min_usd", String(min_usd));
+      if (coin) q.set("coin", coin);
+      if (side) q.set("side", side);
+      if (accounts) q.set("accounts", accounts);
+      const n = limit ?? (wantsFull(detail) ? undefined : wantsCompact(detail) ? 6 : 12);
+      if (n !== undefined) q.set("limit", String(n));
+      const qs = q.toString();
+      const path = `/api/public/hyperliquid-moves${qs ? `?${qs}` : ""}`;
+      const data = await fetchJson(path);
+      return okDetail("get_hl_whale_moves", detail, compact(data, path, (rec, t) => {
+        const cards = list(rec.cards).length;
+        const total = typeof rec.positions_total === "number" ? rec.positions_total : cards;
+        if (limit === undefined && !wantsFull(detail)) t.note("cards", cards, total, "pass limit up to 96");
+      }));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "get_hl_liquidation_risk",
+  {
+    title: "Hyperliquid positions near liquidation: the dollars within 5% and 10%, a ladder by distance, the nearest positions",
+    description:
+      "Call this when the user asks which large Hyperliquid positions are closest to liquidation, how much would be liquidated if the price fell or rose a few percent, or where the large positions' liquidation prices cluster. The distance is the price move, in percent of the price now, that reaches the liquidation price the venue reports (a fall for a long, a rise for a short). Returns totals (the dollars within 5% and 10% per side, positions read), a ladder in steps of 1% out to 25% on each side of the price (notional_usd_large is the part in positions of $10M and more) and rows, nearest first, with size, entry, liquidation price, price now, leverage, account value and the wallet's behaviour label (an address is never given a name). Stock, index and commodity contracts on the builder-deployed markets are included. The totals and the ladder cover every position of $1M and more for every key, and the rows of $10M and more on one-sided accounts are open to every key; the rows from $1M, coin, side and accounts are part of Terminal and the plans above it. Not delayed for any key. Without limit, the nearest 25 rows; pass limit (up to 200) for more. Pass detail \"compact\" for a shorter page or \"full\" for the whole answer.",
+    inputSchema: {
+      min_usd: z.number().int().min(1000000).max(10000000).optional().describe("Optional. The size line of the rows: 1000000, 5000000 or 10000000 (default 10000000 on a Free key, 1000000 on Terminal and above; below 10000000 on Terminal and above only)."),
+      coin: HL_COIN,
+      side: HL_SIDE,
+      accounts: z.enum(["one_sided", "all"]).optional().describe("one_sided (default: accounts that hold a direction) or all. Terminal and above."),
+      limit: z.number().int().min(1).max(200).optional().describe("Optional. Rows, nearest first (default 25, up to 200)."),
+      detail: DETAIL,
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ min_usd, coin, side, accounts, limit, detail }: { min_usd?: number; coin?: string; side?: "long" | "short"; accounts?: "one_sided" | "all"; limit?: number; detail?: Detail }) => {
+    try {
+      const q = new URLSearchParams();
+      if (min_usd !== undefined) q.set("min_usd", String(min_usd));
+      if (coin) q.set("coin", coin);
+      if (side) q.set("side", side);
+      if (accounts) q.set("accounts", accounts);
+      const n = limit ?? (wantsFull(detail) ? undefined : wantsCompact(detail) ? 10 : 25);
+      if (n !== undefined) q.set("limit", String(n));
+      const qs = q.toString();
+      const path = `/api/public/hyperliquid-liquidation-risk${qs ? `?${qs}` : ""}`;
+      const data = await fetchJson(path);
+      return okDetail("get_hl_liquidation_risk", detail, compact(data, path, (rec, t) => {
+        const rows = list(rec.rows).length;
+        const total = typeof rec.rows_total === "number" ? rec.rows_total : rows;
+        if (limit === undefined && !wantsFull(detail)) t.note("rows", rows, total, "pass limit up to 200");
+      }));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 server.registerTool(
   "get_venue_share",
   {

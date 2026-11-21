@@ -1,6 +1,6 @@
 /**
  * Compact answers (1.1.0, 2026-10-24). Two callers:
- *   - the `detail: "compact"` value of thirteen large tools (tools.ts): a shorter page than the default one, for a
+ *   - the `detail: "compact"` value of fifteen large tools (tools.ts): a shorter page than the default one, for a
  *     model that only needs the headline figures;
  *   - the AI desk on bykaranteli.com, which runs the same tools in process and caps every tool answer at a fixed
  *     number of characters before the model reads it (compactToolText).
@@ -13,7 +13,7 @@
 export type CompactCut = { field: string; returned: number; total: number; more: string };
 
 export type CompactRule = {
-  /** Items kept per list (default 10; Infinity leaves every list as the tool cut it). The thirteen tool rules leave
+  /** Items kept per list (default 10; Infinity leaves every list as the tool cut it). The fifteen tool rules leave
    * lists alone: each tool cuts its own lists in its handler, where it knows which end of a series is the newest. */
   maxItems?: number;
   /** Per-key item caps by the list's own key, e.g. { exchanges: 3 }; wins over maxItems for that key. */
@@ -172,7 +172,7 @@ export function compactToolText(text: string, cap: number, rule: CompactRule = {
   return { text: fallback, cuts: [], capped: true, chars: fallback.length };
 }
 
-/** The compact rules of the thirteen large tools (measured 24 Oct 2026, olcum/mcp_arac_sayimi.md). Each handler cuts
+/** The compact rules of the fifteen large tools (the first thirteen measured 24 Oct 2026, olcum/mcp_arac_sayimi.md; the two Hyperliquid board tools added in 1.1.8). Each handler cuts
  *  its own lists for detail "compact" (it knows which end of a series is the newest and writes one `trimmed` entry
  *  with consistent counts); these rules only round figures, shorten free text and leave grids out, so every list
  *  stays as the handler cut it (maxItems Infinity). A key here must be a tool that declares `detail`
@@ -192,6 +192,8 @@ export const COMPACT_RULES = {
   get_venue_markets: { maxItems: NO_LIST_CUT },
   get_tokenized_stocks: { maxItems: NO_LIST_CUT, maxString: 300 },
   get_factor_board: { maxItems: NO_LIST_CUT, maxString: 200, keepKeys: ["interpretationEn", "todayText", "bandEn"] },
+  get_hl_whale_moves: { maxItems: NO_LIST_CUT, maxString: 300 },
+  get_hl_liquidation_risk: { maxItems: NO_LIST_CUT, maxString: 300 },
 } as const satisfies Readonly<Record<string, CompactRule>>;
 
 export type CompactToolName = keyof typeof COMPACT_RULES;
