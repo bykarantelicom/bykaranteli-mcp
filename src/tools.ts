@@ -2305,7 +2305,7 @@ const KEY_NEEDED = "This tool reads or changes your own account, so it needs you
 
 /* One call to a member route with the caller's key. The route's own error (limit reached, unknown id, rate) is passed
  * through as the tool error so the model can say what happened. */
-async function account(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; result: ToolResult }> {
+async function account(method: "GET" | "POST" | "DELETE" | "PATCH", path: string, body?: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; result: ToolResult }> {
   const authorization = authorizationFor();
   if (!authorization) return { ok: false, result: errorResult(KEY_NEEDED) };
   try {
@@ -2562,6 +2562,31 @@ server.registerTool("remove_watchlist_symbol", {
  * account key like the alert and watchlist routes. */
 const HL_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const TRACKED_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/* The alert picks of the Hyperliquid board (1.1.10): the channels and the kinds of move of a followed address, as the
+ * member routes accept them (web lib/hl-alerts.ts HL_ALERT_CHANNELS, HL_ALERT_KINDS). */
+const HL_ALERT_CHANNELS = ["telegram", "push", "email"] as const;
+const HL_ALERT_KINDS = ["opens", "adds", "cuts", "closes"] as const;
+/* A list input as the known values, once each, or null when it names anything else. */
+function hlAlertList<T extends string>(raw: unknown, all: readonly T[]): T[] | null {
+  if (!Array.isArray(raw)) return null;
+  if (raw.some((v) => typeof v !== "string" || !(all as readonly string[]).includes(v))) return null;
+  return all.filter((v) => raw.includes(v));
+}
+/* The kinds and channels add_tracked_address was given, as the PATCH body (null when neither was), or what is wrong. */
+function hlAlertSettings(kindsIn: unknown, channelsIn: unknown): { ok: true; body: { kinds?: string[]; channels?: string[] } | null } | { ok: false; error: string } {
+  const body: { kinds?: string[]; channels?: string[] } = {};
+  if (kindsIn !== undefined) {
+    const kinds = hlAlertList(kindsIn, HL_ALERT_KINDS);
+    if (!kinds || kinds.length === 0) return { ok: false, error: `Invalid input: kinds names at least one of ${HL_ALERT_KINDS.join(", ")}.` };
+    body.kinds = kinds;
+  }
+  if (channelsIn !== undefined) {
+    const channels = hlAlertList(channelsIn, HL_ALERT_CHANNELS);
+    if (!channels || channels.length === 0) return { ok: false, error: `Invalid input: channels names at least one of ${HL_ALERT_CHANNELS.join(", ")}.` };
+    body.channels = channels;
+  }
+  return { ok: true, body: body.kinds || body.channels ? body : null };
+}
 
 server.registerTool("list_tracked_addresses", {
   title: "List the Hyperliquid addresses you follow (reads your account)",
@@ -2576,19 +2601,29 @@ server.registerTool("list_tracked_addresses", {
 
 server.registerTool("add_tracked_address", {
   title: "Follow a Hyperliquid address for position alerts (writes to your account)",
-  description: "Call this when the user asks to follow, track or get alerts for a Hyperliquid address (0x followed by 40 hex characters). Every later position change of the address (opened, closed, increased, reduced, flipped) reaches the user's alert channels; the first sight is the baseline and sends nothing. Counted against the plan's address limit; the route answers terminal_required or limit_reached when it cannot add.",
+  description: "Call this when the user asks to follow, track or get alerts for a Hyperliquid address (0x followed by 40 hex characters), or to change which moves of an address they follow alert them and where. Every later position change of the address (opened, closed, increased, reduced, flipped) reaches the user's alert channels; the first sight is the baseline and sends nothing. kinds narrows the alert to opens, adds, cuts or closes (a flip counts as an open and as a close) and channels picks telegram, push or email; on an address already followed the same call changes its kinds and channels and keeps the follow. Messages are in English; a channel the account has not connected stays silent (connect Telegram or the phone at https://bykaranteli.com/dashboard/settings). Counted against the plan's address limit; the route answers terminal_required or limit_reached when it cannot add.",
   inputSchema: {
     address: z.string().describe("string, 0x followed by 40 hex characters"),
     label: z.string().optional().describe("string, optional name for the address, up to 40 characters"),
+    kinds: z.array(z.enum(HL_ALERT_KINDS)).optional().describe("array, optional: the kinds of move the alert tells, one or more of opens, adds, cuts, closes (default: every kind)"),
+    channels: z.array(z.enum(HL_ALERT_CHANNELS)).optional().describe("array, optional: where the alert goes, one or more of telegram, push (the phone app or a browser with notifications on), email (default: Telegram when connected, the phone when registered, email where no Telegram message can go)"),
   },
   annotations: ACCOUNT_WRITE_IDEMPOTENT,
 }, async (args: Record<string, unknown> = {}) => {
   const address = typeof args.address === "string" ? args.address.trim().toLowerCase() : "";
   if (!HL_ADDRESS_RE.test(address)) return errorResult("Invalid input: address is 0x followed by 40 hex characters.");
   const label = typeof args.label === "string" ? args.label.trim().slice(0, 40) : undefined;
+  const alerts = hlAlertSettings(args.kinds, args.channels);
+  if (!alerts.ok) return errorResult(alerts.error);
   const r = await account("POST", "/api/member/hl-addresses", { address, ...(label ? { label } : {}) });
   if (!r.ok) return r.result;
-  return okResult(r.data);
+  if (!alerts.body) return okResult(r.data);
+  /* The follow exists (new or already there): its alert settings go through the follow's own route. */
+  const id = typeof r.data.id === "string" ? r.data.id : "";
+  if (!TRACKED_ID_RE.test(id)) return errorResult(`The address is followed, but its alert settings were not changed: the answer carried no follow id. list_tracked_addresses shows it.`);
+  const p = await account("PATCH", `/api/member/hl-addresses/${encodeURIComponent(id)}`, alerts.body);
+  if (!p.ok) return errorResult(`The address is followed (id ${id}), but its alert settings were not changed: ${p.result.content[0]?.text ?? "unknown error"}`);
+  return okResult({ ...r.data, alerts: { kinds: p.data.kinds, channels: p.data.channels } });
 });
 
 server.registerTool("remove_tracked_address", {
@@ -2604,6 +2639,68 @@ server.registerTool("remove_tracked_address", {
   const r = await account("DELETE", `/api/member/hl-addresses/${encodeURIComponent(id)}`);
   if (!r.ok) return r.result;
   return okResult(r.data);
+});
+
+/* Alerts on views of the Hyperliquid large moves feed (1.1.10, bykaranteli.com pending 2.157 block C, 2026-11-22): the
+ * member routes /api/member/hl-view-alerts take the account key like the address routes. The figures in the text are
+ * web constants this package cannot import: HL_VIEW_ALERTS_MAX (10 alerts an account) and HL_BOARD_SIZE_STEPS (the
+ * size lines); the hosted bridge builds the same text from them and its parity test holds the two equal. */
+const HL_VIEW_ACCOUNTS = ["one_sided", "new", "all"] as const;
+const HL_VIEW_SIZE_LINES = [1000000, 5000000, 10000000, 30000000] as const;
+const HL_VIEW_COIN_RE = /^(?:[A-Za-z0-9]{1,10}:)?[A-Za-z0-9]{1,20}$/;
+
+server.registerTool("list_hl_view_alerts", {
+  title: "List your alerts on views of the Hyperliquid large moves feed (reads your account)",
+  description: "Call this when the user asks which alerts they have on large Hyperliquid moves, or before changing or removing one. Returns each alert that is on (id, accounts, coin, side, min_usd, channels, created_at, last_alert_at, fire_count) and the plan's limit; a view is the accounts the feed shows (one_sided, new or all), one coin or every coin (coin null) and one side or both (side null). Alerts on views are part of Terminal and the plans above it: on a Free account the list is empty and upgradeHref is the way up.",
+  inputSchema: {},
+  annotations: ACCOUNT_READ,
+}, async () => {
+  const r = await account("GET", "/api/member/hl-view-alerts");
+  if (!r.ok) return r.result;
+  return okResult({ ...r.data, page: "https://bykaranteli.com/hyperliquid-whales/moves" });
+});
+
+server.registerTool("save_hl_view_alert", {
+  title: "Save an alert on a view of the Hyperliquid large moves feed (writes to your account)",
+  description: "Call this when the user asks to be alerted about large Hyperliquid moves, for example every move of $5M and more on BTC, the shorts of new wallets or every large move. A view is the accounts the feed shows, one coin or every coin, and one side or both; the alert tells the user about every move the view shows of min_usd and more, from the moment it is saved, on the channels picked. A view has one alert an account: saving the same view again changes its size line and channels (created is false). An account keeps 10 alerts on views; the route answers limit_reached at the limit and terminal_required on a Free account (alerts on views are part of Terminal and the plans above it). Messages are in English; a channel the account has not connected stays silent (connect Telegram or the phone at https://bykaranteli.com/dashboard/settings). Writes are rate limited per connection (sign-in or key) and each one is recorded on the account.",
+  inputSchema: {
+    accounts: z.enum(HL_VIEW_ACCOUNTS).optional().describe("one_sided (default: accounts that hold a direction), new (young wallets) or all."),
+    coin: z.string().trim().max(40).regex(/^(?:[A-Za-z0-9]{1,10}:)?[A-Za-z0-9]{1,24}$/).optional().describe("One coin as Hyperliquid names it, e.g. BTC, HYPE, xyz:NVDA (a builder-deployed market carries its dex in front; any case); left out for every coin."),
+    side: z.enum(["long", "short"]).optional().describe("long or short; left out for both sides."),
+    min_usd: z.number().int().min(1000000).max(30000000).describe("The size line of the alert: 1000000, 5000000, 10000000 or 30000000."),
+    channels: z.array(z.enum(HL_ALERT_CHANNELS)).describe("array, where the alert goes, one or more of telegram, push (the phone app or a browser with notifications on), email"),
+  },
+  annotations: ACCOUNT_WRITE_IDEMPOTENT,
+}, async (args: Record<string, unknown> = {}) => {
+  const accounts = args.accounts === undefined ? "one_sided" : HL_VIEW_ACCOUNTS.find((a) => a === args.accounts);
+  if (!accounts) return errorResult(`Invalid input: accounts is one of ${HL_VIEW_ACCOUNTS.join(", ")}.`);
+  const coin = typeof args.coin === "string" ? args.coin.trim() : "";
+  if (coin && !HL_VIEW_COIN_RE.test(coin)) return errorResult("Invalid input: coin is a coin as Hyperliquid names it (BTC, HYPE, xyz:NVDA), or left out for every coin.");
+  if (args.side !== undefined && args.side !== "long" && args.side !== "short") return errorResult("Invalid input: side is long or short, or left out for both.");
+  const minUsd = HL_VIEW_SIZE_LINES.find((v) => v === args.min_usd);
+  if (minUsd === undefined) return errorResult(`Invalid input: min_usd is one of ${HL_VIEW_SIZE_LINES.join(", ")}.`);
+  const channels = hlAlertList(args.channels, HL_ALERT_CHANNELS);
+  if (!channels || channels.length === 0) return errorResult(`Invalid input: channels names at least one of ${HL_ALERT_CHANNELS.join(", ")}.`);
+  const body = { accounts, ...(coin ? { coin } : {}), ...(args.side ? { side: args.side } : {}), min_usd: minUsd, channels };
+  const r = await account("POST", "/api/member/hl-view-alerts", body);
+  if (!r.ok) return r.result;
+  return okResult({ ...r.data, page: "https://bykaranteli.com/hyperliquid-whales/moves" });
+});
+
+server.registerTool("remove_hl_view_alert", {
+  title: "Remove an alert on a view of the Hyperliquid large moves feed (writes to your account)",
+  description: "Call this when the user asks to stop an alert on large Hyperliquid moves. Takes the id from list_hl_view_alerts; the alert is switched off, not deleted, and saving the same view again with save_hl_view_alert switches it on from that moment. An id that is not one of the account's alerts changes nothing and says so. Allowed on every plan.",
+  inputSchema: {
+    id: z.string().describe("string, the id from list_hl_view_alerts"),
+  },
+  annotations: ACCOUNT_DELETE,
+}, async (args: Record<string, unknown> = {}) => {
+  const id = typeof args.id === "string" ? args.id.trim() : "";
+  if (!TRACKED_ID_RE.test(id)) return errorResult("Invalid input: id is the value list_hl_view_alerts returns.");
+  const r = await account("DELETE", `/api/member/hl-view-alerts/${encodeURIComponent(id)}`);
+  if (!r.ok) return r.result;
+  if (r.data.removed === 0) return errorResult(`No alert on a view with id ${id} on this account; list_hl_view_alerts shows the ids.`);
+  return okResult({ ok: true, id, removed: true });
 });
 
 }

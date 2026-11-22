@@ -2,6 +2,15 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.10] - 2026-11-22
+
+73 tools. Three new account tools and two new inputs.
+
+### Added
+
+- `list_hl_view_alerts`, `save_hl_view_alert` and `remove_hl_view_alert`: the alerts on views of the Hyperliquid large moves feed, the same alerts the box on bykaranteli.com/hyperliquid-whales/moves saves. A view is the accounts the feed shows (`one_sided`, `new`, `all`), one coin or every coin and one side or both; the alert tells about every move the view shows of `min_usd` and more (1000000, 5000000, 10000000 or 30000000), from the moment it is saved, on the channels picked (`telegram`, `push`, `email`). A view has one alert an account, so saving it again changes its size line and channels; an account keeps 10. Terminal and the plans above it; a Free account gets an empty list and the way up. A removed alert is switched off, not deleted. Read and write `/api/member/hl-view-alerts` with the account key.
+- `add_tracked_address` takes optional `kinds` (`opens`, `adds`, `cuts`, `closes`) and `channels` (`telegram`, `push`, `email`): after the follow is made, or on an address already followed, the tool writes them through `PATCH /api/member/hl-addresses/{id}` and answers with the settings saved.
+
 ## [1.1.9] - 2026-11-22
 
 70 tools. One tool's default answer.

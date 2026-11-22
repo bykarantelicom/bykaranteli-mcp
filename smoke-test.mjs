@@ -64,11 +64,11 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 70, names.join(","));
-/* 0.31.0: the account tools act on the caller's own account. The four writes are never called here; the account reads
+check("tools/list count", names.length === 73, names.join(","));
+/* 0.31.0: the account tools act on the caller's own account. The writes are never called here (WRITE_TOOLS); the account reads
  * run only with a key (BYKARANTELI_API_KEY), since without one they answer with the key steps by design. */
-const WRITE_TOOLS = new Set(["create_alert_recipe", "delete_alert_recipe", "add_watchlist_symbol", "remove_watchlist_symbol", "add_tracked_address", "remove_tracked_address"]);
-const ACCOUNT_READ_TOOLS = new Set(["list_alert_recipes", "list_watchlists", "parse_alert_text", "list_tracked_addresses"]);
+const WRITE_TOOLS = new Set(["create_alert_recipe", "delete_alert_recipe", "add_watchlist_symbol", "remove_watchlist_symbol", "add_tracked_address", "remove_tracked_address", "save_hl_view_alert", "remove_hl_view_alert"]);
+const ACCOUNT_READ_TOOLS = new Set(["list_alert_recipes", "list_watchlists", "parse_alert_text", "list_tracked_addresses", "list_hl_view_alerts"]);
 const HAS_KEY = Boolean((process.env.BYKARANTELI_API_KEY ?? "").trim());
 const tools = list.result?.tools ?? [];
 check(
@@ -82,7 +82,7 @@ check(
   "write tools annotated as writes, removals destructive",
   tools.filter((t) => WRITE_TOOLS.has(t.name)).length === WRITE_TOOLS.size &&
     tools.filter((t) => WRITE_TOOLS.has(t.name)).every((t) => t.annotations?.readOnlyHint === false && t.title.endsWith("(writes to your account)")) &&
-    ["delete_alert_recipe", "remove_watchlist_symbol", "remove_tracked_address"].every((n) => tools.find((t) => t.name === n)?.annotations?.destructiveHint === true),
+    ["delete_alert_recipe", "remove_watchlist_symbol", "remove_tracked_address", "remove_hl_view_alert"].every((n) => tools.find((t) => t.name === n)?.annotations?.destructiveHint === true),
   "",
 );
 

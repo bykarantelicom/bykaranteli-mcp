@@ -2,7 +2,7 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-70 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series) and a monthly allowance of x402 catalog calls within each plan's history window ([Plans and paid depth](#plans-and-paid-depth)). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
+73 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series) and a monthly allowance of x402 catalog calls within each plan's history window ([Plans and paid depth](#plans-and-paid-depth)). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
 
 ## Hosted endpoint (no install)
 
@@ -163,10 +163,13 @@ These tools read and change your own ByKaranteli account with the same key: the 
 | `add_watchlist_symbol` | Adds a symbol to your default list or the list you name (writes to your account). |
 | `remove_watchlist_symbol` | Removes a symbol from a list (writes to your account). |
 | `list_tracked_addresses` | Lists the Hyperliquid addresses you follow, with their last positions (reads your account). |
-| `add_tracked_address` | Follows a Hyperliquid address for position alerts (writes to your account; Terminal and above). |
+| `add_tracked_address` | Follows a Hyperliquid address for position alerts; optional `kinds` (opens, adds, cuts, closes) and `channels` (telegram, push, email) set which moves alert you and where, also on an address you already follow (writes to your account; Terminal and above). |
 | `remove_tracked_address` | Stops following an address (writes to your account). |
+| `list_hl_view_alerts` | Lists your alerts on views of the Hyperliquid large moves feed: accounts, coin, side, size line, channels and when each last fired (reads your account). |
+| `save_hl_view_alert` | Saves an alert on a view of the large moves feed (accounts, coin, side) with a size line and channels; saving the same view again changes it (writes to your account; Terminal and above). |
+| `remove_hl_view_alert` | Switches off one of those alerts by id (writes to your account). |
 
-- The write tools carry `readOnlyHint: false` (and `destructiveHint: true` for the two that remove something), so clients that ask before a change will ask.
+- The write tools carry `readOnlyHint: false` (and `destructiveHint: true` for the ones that remove something), so clients that ask before a change will ask.
 - How many recipes an account keeps follows its plan; past it, `create_alert_recipe` answers with the limit instead of saving.
 - Every call counts on the key's plan like any other request; writes are also rate limited per key, and each write is recorded on the account with the key that made it.
 - Recipes and watchlist changes show up at once on <https://bykaranteli.com/dashboard/alerts> and <https://bykaranteli.com/dashboard/watchlist>.
