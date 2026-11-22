@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.9] - 2026-11-22
+
+70 tools. One tool's default answer.
+
+### Changed
+
+- `get_hl_positions` takes `detail` (`"compact"`, `"full"`) and answers a shorter page by default. The BTC map had grown to some 480 liquidation price bands since the scan reads every account with large positions (about 46,000 characters). Without `detail`, the `long` and `short` bands within 25% of the mark on either side, or the nearest 30 of a side when that is more (the 60 bands with the most notional when an answer carries no mark), and at most the newest 168 hours of `history`; `"compact"` keeps the bands within 10% or the nearest 12 (24 bands without a mark) and 48 hours, figures rounded; `"full"` returns the whole route answer, as before. Every cut is named in `trimmed`; `largest`, `totals` and `model_comparison` are always whole. `coin` and `hours` work as before; sixteen tools now take `detail`. The route, `/api/public/hyperliquid-positions`, is unchanged.
+
 ## [1.1.8] - 2026-11-21
 
 70 tools. Two new tools.

@@ -80,12 +80,12 @@ test("compactToolText cuts non-JSON text at the cap with a marker", () => {
   assert.ok(out.text.length <= 200);
 });
 
-test("the tools that declare detail are exactly the fifteen with a compact rule", () => {
+test("the tools that declare detail are exactly the sixteen with a compact rule", () => {
   const withDetail = [];
   const collector = { registerTool: (name, def) => { if (def.inputSchema && "detail" in def.inputSchema) withDetail.push(name); } };
   registerByKaranteliTools(collector, { baseUrl: "http://127.0.0.1:1", publicUrl: "https://bykaranteli.com", version: "test" });
   assert.deepEqual([...withDetail].sort(), [...COMPACT_TOOL_NAMES].sort());
-  assert.equal(COMPACT_TOOL_NAMES.length, 15);
+  assert.equal(COMPACT_TOOL_NAMES.length, 16);
   for (const name of COMPACT_TOOL_NAMES) assert.equal(COMPACT_RULES[name].maxItems, Number.POSITIVE_INFINITY, `${name}: lists are cut by the handler`);
   assert.ok(COMPACT_RULES.get_liqmap.drop.includes("heatmap_cells"));
 });

@@ -1942,21 +1942,65 @@ server.registerTool(
   {
     title: "Hyperliquid tracked positions: the liquidation price map of the large accounts per coin, against the LiqMap model",
     description:
-      "Call this when the user asks where Hyperliquid whales would be liquidated, how much tracked notional sits at each price, how the large accounts lean on a coin, or how their liquidation prices compare with the LiqMap model. The universe is every account whose open perpetual positions add up to a large sum, found in the venue's public fill record, together with the largest accounts by equity on its public leaderboard; positions are read on the main dex and on the builder-deployed dexes (markets such as xyz:NVDA), the largest accounts every 5 minutes, the others every 15 minutes or as fast as the venue's request limit allows; the levels are their own liquidation prices bucketed around the mark. hours returns the hourly archive of level totals.",
+      "Call this when the user asks where Hyperliquid whales would be liquidated, how much tracked notional sits at each price, how the large accounts lean on a coin, or how their liquidation prices compare with the LiqMap model. The universe is every account whose open perpetual positions add up to a large sum, found in the venue's public fill record, together with the largest accounts by equity on its public leaderboard; positions are read on the main dex and on the builder-deployed dexes (markets such as xyz:NVDA), the largest accounts every 5 minutes, the others every 15 minutes or as fast as the venue's request limit allows; the levels are their own liquidation prices bucketed around the mark. hours returns the hourly archive of level totals. Without detail, the bands within 25% of the mark on either side (at least the nearest 30 per side) and at most the newest 168 hours; pass detail \"compact\" for a shorter page (10%, 48 hours) or \"full\" for every band.",
     inputSchema: {
       coin: z.string().trim().regex(/^(?:[A-Za-z0-9]{1,10}:)?[A-Za-z0-9]{1,24}$/).optional().describe("Coin as Hyperliquid names it, e.g. BTC, kPEPE, xyz:NVDA (default BTC; a builder-deployed market carries its dex in front; any case)"),
       hours: z.number().int().min(1).max(720).optional().describe("Hours of archive to return, 1..720 (default 24)"),
+      detail: DETAIL,
     },
     annotations: READ_ONLY,
   },
-  async ({ coin, hours }: { coin?: string, hours?: number }) => {
+  async ({ coin, hours, detail }: { coin?: string; hours?: number; detail?: Detail }) => {
     try {
       const q = new URLSearchParams();
       if (coin !== undefined) q.set("coin", String(coin));
       if (hours !== undefined) q.set("hours", String(hours));
       const qs = q.toString();
       const path = `/api/public/hyperliquid-positions${qs ? `?${qs}` : ""}`;
-      return ok(withProvenance(await fetchJson(path), path));
+      const data = await fetchJson(path);
+      if (wantsFull(detail)) return ok(withProvenance(data, path));
+      /* 1.1.9: the BTC map grew to some 480 bands when the scan widened on 21 Nov 2026 (about 46,000 characters). The
+       * default page keeps, per side, the bands within `pct` of the mark, or the nearest `floor` bands when that is more
+       * (the route lists each side nearest first; a small coin whose bands sit far out keeps a page, and a side of
+       * `floor` bands or fewer is never cut). Without a mark, the `top` bands with the most notional across both sides,
+       * in the route's order. The hourly archive keeps its newest `hoursMax` points (oldest first, so the tail).
+       * `largest`, `totals` and `model_comparison` are left whole. */
+      const c = wantsCompact(detail);
+      const pct = c ? 10 : 25;
+      const floor = c ? 12 : 30;
+      const top = c ? 24 : 60;
+      const hoursMax = c ? 48 : 168;
+      return okDetail("get_hl_positions", detail, compact(data, path, (rec, t) => {
+        const mark = typeof rec.mark === "number" && rec.mark > 0 ? rec.mark : undefined;
+        const bands = { long: list(rec.long), short: list(rec.short) };
+        const notional = (b: unknown): number => (isRec(b) && typeof b.notional_usd === "number" ? b.notional_usd : 0);
+        let keep: (b: unknown, i: number) => boolean;
+        let more: string;
+        if (mark !== undefined) {
+          keep = (b, i) => {
+            if (i < floor) return true;
+            if (!isRec(b)) return false;
+            const d = typeof b.distance_pct === "number" ? b.distance_pct : typeof b.price === "number" ? (b.price / mark - 1) * 100 : undefined;
+            return d !== undefined && Math.abs(d) <= pct;
+          };
+          more = `bands within ${pct}% of the mark (at least the nearest ${floor}); pass detail "full" for every band`;
+        } else {
+          const kept = new Set([...bands.long, ...bands.short].sort((a, b) => notional(b) - notional(a)).slice(0, top));
+          keep = (b) => kept.has(b);
+          more = `the ${top} bands with the most notional; pass detail "full" for every band`;
+        }
+        for (const side of ["long", "short"] as const) {
+          if (!Array.isArray(rec[side])) continue;
+          const out = bands[side].filter(keep);
+          t.note(side, out.length, bands[side].length, more);
+          rec[side] = out;
+        }
+        const history = list(rec.history);
+        if (Array.isArray(rec.history) && history.length > hoursMax) {
+          t.note("history", hoursMax, history.length, `the newest ${hoursMax} hours; pass detail "full" for every hour asked`);
+          rec.history = history.slice(-hoursMax);
+        }
+      }));
     } catch (err) {
       return fail(err);
     }

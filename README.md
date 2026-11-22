@@ -136,7 +136,7 @@ Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). On an older No
 | `get_liqmap` | "Where are the BTC liquidation clusters?", "Where would leveraged longs get liquidated?", "Where are the gold (XAU) or crude oil (CL) liquidation clusters?" |
 | `get_market_profile` | "Where is the BTC point of control today?", "What was yesterday's value area?", "Which naked POCs are still untested?" |
 | `get_options_chain` | "How did BTC open interest move by strike today?", "Where is ETH ATM IV hour by hour?", "Which expiry gained the most open interest in 24h?" |
-| `get_hl_positions` | "Where do Hyperliquid whales get liquidated on BTC?", "How much tracked notional sits below price?", "Where would xyz:GOLD longs get liquidated?", "Does the model agree with the tracked positions?" |
+| `get_hl_positions` | "Where do Hyperliquid whales get liquidated on BTC?", "How much tracked notional sits below price?", "Where would xyz:GOLD longs get liquidated?", "Does the model agree with the tracked positions?" (default: the bands within 25% of the mark; `detail: "full"` for every band) |
 | `get_hl_whale_moves` | "What did Hyperliquid's largest traders just open or close?", "How did this large BTC long get built?", "Which one-sided wallets added to shorts today?" |
 | `get_hl_liquidation_risk` | "Which large Hyperliquid positions are closest to liquidation?", "How much would a 5% drop liquidate among the large accounts?", "Where do the large liquidation prices cluster?" |
 | `get_venue_share` | "Which exchange had the most liquidations this week?", "How is perp open interest split by venue?" |
@@ -147,7 +147,7 @@ All market answers are JSON and carry a `generatedAt` timestamp, a `source` URL 
 
 Answers are sized for a model's context: a call without arguments returns a short first page (for example 30 rows, or the newest points of a series), never a whole board. Every shortened list is named in `trimmed` with `field`, `returned`, `total` and `more`, the parameter that returns the rest (`symbol`, `coin`, `asset`, `limit`, `days`, `detail` and the like); a filtered call keeps its full detail. One answer is capped at 100,000 characters; above that the tool says how to narrow the call.
 
-Fifteen large tools (get_liqmap, get_turkey_premium, get_correlations, get_hl_whales, get_options_flow, get_funding_arbitrage, get_desk_notes, get_positioning, get_coverage, get_new_listings, get_venue_markets, get_tokenized_stocks, get_factor_board, get_hl_whale_moves, get_hl_liquidation_risk) also take `detail`: `"compact"` answers a shorter page than the default one (fewer rows, numbers rounded to six significant digits, long free text cut, grids left out; every cut named in `trimmed`), `"full"` the whole route answer. get_liqmap and get_coverage keep their boolean form, where `true` means full. Since 1.1.0.
+Sixteen large tools (get_liqmap, get_turkey_premium, get_correlations, get_hl_whales, get_options_flow, get_funding_arbitrage, get_desk_notes, get_positioning, get_coverage, get_new_listings, get_venue_markets, get_tokenized_stocks, get_factor_board, get_hl_whale_moves, get_hl_liquidation_risk, get_hl_positions) also take `detail`: `"compact"` answers a shorter page than the default one (fewer rows, numbers rounded to six significant digits, long free text cut, grids left out; every cut named in `trimmed`), `"full"` the whole route answer. get_liqmap and get_coverage keep their boolean form, where `true` means full. Since 1.1.0.
 
 ## Account tools (alerts and watchlist)
 
