@@ -2,7 +2,7 @@
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
-73 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series) and a monthly allowance of x402 catalog calls within each plan's history window ([Plans and paid depth](#plans-and-paid-depth)). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
+74 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series) and a monthly allowance of x402 catalog calls within each plan's history window ([Plans and paid depth](#plans-and-paid-depth)). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
 
 ## Hosted endpoint (no install)
 
@@ -100,6 +100,7 @@ Requires Node.js 20 or newer (1.0.0; the 0.x releases ran on 18). On an older No
 | `get_slippage` | "How much slippage on a $1M market order?", "Which book is thinnest?" |
 | `get_fomc_impact` | "What does BTC do on Fed days?", "When is the next FOMC meeting?" |
 | `get_liquidation_cascades` | "What caused that flush?", "Who got liquidated this week?" |
+| `get_monthly_report` | "What happened in crypto derivatives last month?", "How much was liquidated in October, and how much of it was longs?" |
 | `get_open_interest` | "Is leverage entering the market?", "Are shorts building in XRP?" |
 | `get_psi_charge` | "What liquidity state is the market in?", "Is parked money deploying?" |
 | `get_theme_indices` | "Which crypto narrative is leading: AI, RWA, DePIN, memes, L2s, DeFi?" |

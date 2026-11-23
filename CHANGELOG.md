@@ -2,6 +2,14 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.11] - 2026-11-23
+
+74 tools. One new tool.
+
+### Added
+
+- `get_monthly_report`: the report of one finished calendar month of crypto derivatives, the JSON twin of bykaranteli.com/reports. With `month` (`YYYY-MM` or `latest`): liquidations by UTC day in whole dollars with the long and short split, the largest coins, every market-wide cascade, US spot Bitcoin and Ether ETF sessions, the Coinbase premium by day, BTC price, open interest and the implied volatility index over the month, new perpetual listings, the coverage the totals stand on, a highest or lowest label only among months on the same coverage, the desk's dated note when there is one, and links to the page, its Markdown and its PDF. Without `month`: the months that have a report, newest first, each with its headline figures. Liquidation totals are a floor. A month's report appears about half an hour after midnight UTC on the first of the next month; a month without one answers 404 `no_report`. A value that is not `YYYY-MM` or `latest` is refused before any call. Reads `/api/public/monthly-report`; the provenance names `/reports` as its page.
+
 ## [1.1.10] - 2026-11-22
 
 73 tools. Three new account tools and two new inputs.

@@ -64,7 +64,7 @@ notify("notifications/initialized", {});
 
 const list = await rpc("tools/list", {});
 const names = (list.result?.tools ?? []).map((t) => t.name).sort();
-check("tools/list count", names.length === 73, names.join(","));
+check("tools/list count", names.length === 74, names.join(","));
 /* 0.31.0: the account tools act on the caller's own account. The writes are never called here (WRITE_TOOLS); the account reads
  * run only with a key (BYKARANTELI_API_KEY), since without one they answer with the key steps by design. */
 const WRITE_TOOLS = new Set(["create_alert_recipe", "delete_alert_recipe", "add_watchlist_symbol", "remove_watchlist_symbol", "add_tracked_address", "remove_tracked_address", "save_hl_view_alert", "remove_hl_view_alert"]);

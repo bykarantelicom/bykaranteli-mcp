@@ -48,6 +48,7 @@ const PAGE_FOR_STEM: Record<string, string> = {
   "/hyperliquid-positions": "/hyperliquid-whales",
   "/hyperliquid-moves": "/hyperliquid-whales/moves",
   "/hyperliquid-liquidation-risk": "/hyperliquid-whales/near-liquidation",
+  "/monthly-report": "/reports",
 };
 
 /** The site page a route's numbers are shown on. */

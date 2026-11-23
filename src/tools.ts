@@ -774,6 +774,33 @@ server.registerTool(
   },
 );
 
+/* The monthly report (1.1.11, bykaranteli.com pending 2.156, 23 Nov 2026): the JSON twin of /reports and
+ * /reports/<year-month>. The month is checked here so a bad value reaches no route; the hosted bridge carries the same
+ * tool in web/src/lib/mcp-extra-tools.ts and mcp-extra-tools.test.ts holds the two equal. */
+const MONTHLY_REPORT_MONTH = /^(?:\d{4}-(?:0[1-9]|1[0-2])|latest)$/;
+server.registerTool(
+  "get_monthly_report",
+  {
+    title: "Monthly report: one finished month of crypto derivatives (liquidations, cascades, ETF flows, market state)",
+    description:
+      "Call this when the user asks what happened in crypto derivatives last month or in a given month, wants a month's liquidation total with its long and short split, the heaviest day or the largest single liquidation of a month, the month's market-wide liquidation cascades, the month's US spot Bitcoin and Ether ETF net flows, the Coinbase premium over a month, or how BTC price, open interest and implied volatility moved over a month, or wants a monthly figure to quote with its source. Returns the report of one finished calendar month in whole US dollars over UTC days: liquidations by day with the long and short split, the largest coins, every cascade, the ETF sessions, the premium by day, BTC price, open interest and the volatility index, new perpetual listings, the coverage the totals stand on (venues counted all month, venues that joined, days coverage widened), a highest or lowest label only among months on the same coverage, the desk's dated note when there is one, and links to the page, its Markdown and its PDF. Liquidation totals are a floor: what our own recorders saw on the counted venues, not a market total. Pass month as YYYY-MM or latest; without month, the list of months that have a report, newest first, each with its headline figures. A month's report appears about half an hour after midnight UTC on the first of the next month and its tables stay live afterwards (tables_moved_at says when one last changed); a month without a report (the month in progress, or one before the record) answers 404 no_report with the months that have one.",
+    inputSchema: {
+      month: z.string().max(7).optional().describe("string, optional month: YYYY-MM (e.g. 2026-10) or latest; omit it for the list of months"),
+    },
+    annotations: READ_ONLY,
+  },
+  async ({ month }: { month?: string }) => {
+    const m = typeof month === "string" ? month.trim().toLowerCase() : "";
+    if (m && !MONTHLY_REPORT_MONTH.test(m)) return fail(new InputError("month is YYYY-MM (e.g. 2026-10) or latest."));
+    const path = `/api/public/monthly-report${m ? `?month=${m}` : ""}`;
+    try {
+      return ok(withProvenance(await fetchJson(path), path));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
 server.registerTool(
   "get_liquidation_leaderboard",
   {
