@@ -1,5 +1,7 @@
 # bykaranteli-mcp
 
+[![bykarantelicom/bykaranteli-mcp MCP server](https://glama.ai/mcp/servers/bykarantelicom/bykaranteli-mcp/badges/score.svg)](https://glama.ai/mcp/servers/bykarantelicom/bykaranteli-mcp)
+
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
 74 read-only and account tools over the public JSON API of [bykaranteli.com](https://bykaranteli.com/developers): the market data tools only read, and the alert and watchlist tools act on your own account through your key ([Account tools](#account-tools-alerts-and-watchlist)). Since 2026-09-10 the API asks programs for an account key: a **free key** comes with any verified account at <https://bykaranteli.com/dashboard/api> (30 requests a minute and 15,000 a month, public depth), and the Builder, Business and Scale plans raise the rate and the monthly fair use and unlock member depth (LiqMap on seven timeframes, 5-minute series) and a monthly allowance of x402 catalog calls within each plan's history window ([Plans and paid depth](#plans-and-paid-depth)). Set it as `BYKARANTELI_API_KEY`. Data covers Binance USDT-M perpetuals; funding arbitrage, liquidations, order book depth, options, positioning and insurance funds add the other venues each board lists on bykaranteli.com/coverage.
