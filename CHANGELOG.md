@@ -2,6 +2,15 @@
 
 Notable changes to the `bykaranteli-mcp` package. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates are UTC and come from the git tag of each release (the version commit where no tag exists). The tool count is the number of tools the server registers in that release.
 
+## [1.1.12] - 2026-11-24
+
+74 tools. Three tool descriptions.
+
+### Changed
+
+- `list_tracked_addresses` says what the answer has carried since 1.1.10: every followed address comes with `alerts`, its `kinds` (the moves it tells about; empty means every kind) and `channels` (where it goes; empty means none was picked, so Telegram first and email when no Telegram message went out).
+- `get_hl_whales` and `get_hl_positions` give the cadence the scan reaches and the instant reading: the largest accounts every 5 minutes, the others every 20 to 25 minutes (measured on 24 November 2026; the venue's request limit sets the pace), and an account that trades a net $1,000,000 of a single coin between two readings is read at once. Until now they said the others were read every 15 minutes, the scan's target and not what it reaches.
+
 ## [1.1.11] - 2026-11-23
 
 74 tools. One new tool.
