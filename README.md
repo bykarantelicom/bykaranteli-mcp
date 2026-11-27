@@ -1,6 +1,6 @@
 # bykaranteli-mcp
 
-[![bykarantelicom/bykaranteli-mcp MCP server](https://glama.ai/mcp/servers/bykarantelicom/bykaranteli-mcp/badges/score.svg)](https://glama.ai/mcp/servers/bykarantelicom/bykaranteli-mcp)
+[![bykarantelicom/bykaranteli-mcp MCP server](https://glama.ai/mcp/servers/bykarantelicom/bykaranteli-mcp/badges/score.svg)](https://glama.ai/mcp/servers/bykarantelicom/bykaranteli-mcp) [![ByKaranteli MCP connector](https://glama.ai/mcp/connectors/com.bykaranteli/mcp/badges/score.svg)](https://glama.ai/mcp/connectors/com.bykaranteli/mcp)
 
 MCP (Model Context Protocol) server for **live crypto derivatives data**: funding rates, cross-exchange funding arbitrage, open interest pressure, liquidations, options, ETF flows, Fear & Greed and BTC dominance.
 
